@@ -1,33 +1,63 @@
-import { getDb } from "./db.js";
+import { TrashService } from "./services/trash.service.js";
+import { userRepository } from "./repositories/user.repository.js";
+import { logger } from "./utils/logger.js";
+import { TaskService } from "./services/task.service.js";
+import { notificationService } from "./services/notification.service.js";
 
 export function initCronJobs() {
-  console.log("[SimplLife Cron] Registered daily background tasks.");
+  logger.info("Registered daily background tasks.");
 
-  // Daily trash cleanup (runs every 24 hours)
   setInterval(() => {
     void (async () => {
       try {
-        const db = getDb();
-        const deleted = await db.autoEmptyTrashOlderThanDays(30);
+        const deleted = await TrashService.autoEmpty(30);
         if (deleted > 0) {
-          console.log(`[SimplLife Cron] Trash auto-emptied: ${deleted} records deleted.`);
+          logger.info(`Trash auto-emptied: ${deleted} records deleted.`);
         }
       } catch (err) {
-        console.error("[SimplLife Cron] Error auto-emptying trash:", err);
+        logger.error("Error auto-emptying trash:", err);
       }
     })();
   }, 24 * 60 * 60 * 1000);
 
-  // Daily digest email scheduler log
   setInterval(() => {
     void (async () => {
       try {
-        const db = getDb();
-        const users = await db.listAllUsers();
+        const users = await userRepository.listAll();
         const enabled = users.filter((u) => u.digestEmailsEnabled !== false);
-        console.log(`[SimplLife Cron] Daily digest email check for ${enabled.length} users.`);
+        logger.info(`Daily digest email check for ${enabled.length} users.`);
+
+        for (const user of enabled) {
+          try {
+            const { today, tasks } = await TaskService.getUpcoming(user.id);
+            // filter tasks due today or overdue (dueDate <= today)
+            const dueTodayOrOverdue = tasks.filter(
+              (t) => t.dueDate && t.dueDate.split("T")[0] <= today
+            );
+            if (dueTodayOrOverdue.length === 0) continue;
+
+            const listStr = dueTodayOrOverdue
+              .map((t) => {
+                const dateOnly = t.dueDate ? t.dueDate.split("T")[0] : "";
+                return `- ${t.title} (Due: ${dateOnly})`;
+              })
+              .join("\n");
+
+            const body = `Here's what's on your plate today, ${user.name}:\n\n${listStr}`;
+
+            await notificationService.send({
+              userId: user.id,
+              email: user.email,
+              title: "Your SimplLife Daily Digest",
+              body,
+              type: "email",
+            });
+          } catch (userErr) {
+            logger.error(`Error processing digest for user ${user.id}:`, userErr);
+          }
+        }
       } catch (err) {
-        console.error("[SimplLife Cron] Error sending daily digest:", err);
+        logger.error("Error sending daily digest:", err);
       }
     })();
   }, 24 * 60 * 60 * 1000);

@@ -1,23 +1,21 @@
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
-import { getDb } from "../db.js";
-
-const JWT_SECRET = (process.env.JWT_SECRET as string) || "tasknest-dev-secret-change-me";
-const JWT_EXPIRES_IN = "7d";
+import { userRepository } from "../repositories/user.repository.js";
+import { config } from "../config/index.js";
 
 export interface AuthRequest extends Request {
   userId?: string;
 }
 
 export function signToken(userId: string): string {
-  return jwt.sign({ sub: userId }, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
+  return jwt.sign({ sub: userId }, config.jwt.secret as jwt.Secret, {
+    expiresIn: config.jwt.expiresIn,
   });
 }
 
 export function verifyToken(token: string): { sub: string } | null {
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as { sub: string };
+    const payload = jwt.verify(token, config.jwt.secret) as { sub: string };
     return payload;
   } catch {
     return null;
@@ -29,9 +27,16 @@ export async function requireAuth(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  const header = req.headers.authorization || "";
-  const [scheme, token] = header.split(" ");
-  if (scheme !== "Bearer" || !token) {
+  let token = req.cookies?.token;
+  if (!token) {
+    const header = req.headers.authorization || "";
+    const [scheme, hdrToken] = header.split(" ");
+    if (scheme === "Bearer" && hdrToken) {
+      token = hdrToken;
+    }
+  }
+
+  if (!token) {
     res.status(401).json({ success: false, error: "Unauthorized" });
     return;
   }
@@ -40,7 +45,7 @@ export async function requireAuth(
     res.status(401).json({ success: false, error: "Unauthorized" });
     return;
   }
-  const user = await getDb().findUserById(payload.sub);
+  const user = await userRepository.findById(payload.sub);
   if (!user) {
     res.status(401).json({ success: false, error: "Unauthorized" });
     return;

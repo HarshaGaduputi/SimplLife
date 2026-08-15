@@ -8,8 +8,15 @@ import type {
   Template,
   TrashData,
   User,
+  Goal,
+  Habit,
+  FocusSession,
+  Note,
+  JournalEntry,
 } from "../shared/types.js";
-import { SEED_TEMPLATES } from "./lib/seedTemplates.js";
+import { SEED_TEMPLATES } from "./services/seedTemplates.service.js";
+import { config } from "./config/index.js";
+import { PostgresDatabase } from "./db-pg.js";
 
 type PasswordHash = string;
 
@@ -43,6 +50,11 @@ interface DBState {
     createdAt: string;
   }>;
   activityLogs: ActivityLog[];
+  goals: Map<string, Goal>;
+  habits: Map<string, Habit>;
+  focusSessions: FocusSession[];
+  notes: Map<string, Note>;
+  journalEntries: Map<string, JournalEntry>;
 }
 
 class MemoryDatabase {
@@ -58,6 +70,11 @@ class MemoryDatabase {
       templates: new Map(),
       contactMessages: [],
       activityLogs: [],
+      goals: new Map(),
+      habits: new Map(),
+      focusSessions: [],
+      notes: new Map(),
+      journalEntries: new Map(),
     };
     for (const t of SEED_TEMPLATES) {
       this.state.templates.set(t.id, { ...t });
@@ -68,7 +85,7 @@ class MemoryDatabase {
   async logActivity(params: {
     userId: string;
     action: string;
-    entityType: "group" | "task" | "subtask" | "template" | "user";
+    entityType: ActivityLog['entityType'];
     entityName: string;
     detail?: string | null;
   }): Promise<ActivityLog> {
@@ -167,7 +184,7 @@ class MemoryDatabase {
     return g ?? null;
   }
 
-  async createGroup(userId: string, name: string): Promise<Group> {
+  async createGroup(userId: string, name: string, params?: { description?: string; coverImage?: string; color?: string; icon?: string }): Promise<Group> {
     const existing = await this.listGroups(userId);
     const id = uid("grp");
     const group: Group = {
@@ -175,6 +192,12 @@ class MemoryDatabase {
       userId,
       name,
       order: existing.length,
+      description: params?.description ?? null,
+      coverImage: params?.coverImage ?? null,
+      color: params?.color ?? null,
+      icon: params?.icon ?? null,
+      archived: false,
+      favorite: false,
       deletedAt: null,
       createdAt: now(),
       updatedAt: now(),
@@ -191,7 +214,16 @@ class MemoryDatabase {
 
   async updateGroup(
     id: string,
-    patch: { name?: string; order?: number },
+    patch: {
+      name?: string;
+      order?: number;
+      description?: string | null;
+      coverImage?: string | null;
+      color?: string | null;
+      icon?: string | null;
+      archived?: boolean;
+      favorite?: boolean;
+    },
   ): Promise<Group | null> {
     const current = this.state.groups.get(id);
     if (!current) return null;
@@ -281,6 +313,13 @@ class MemoryDatabase {
     templateId?: string | null;
     priority?: PriorityLevel | null;
     dueDate?: string | null;
+    startDate?: string | null;
+    estimatedDuration?: number | null;
+    actualDuration?: number | null;
+    tags?: string[];
+    recurring?: "daily" | "weekly" | "monthly" | null;
+    pinned?: boolean;
+    favorite?: boolean;
   }): Promise<Task> {
     const group = this.state.groups.get(params.groupId);
     if (!group) throw new Error("Group not found");
@@ -299,6 +338,15 @@ class MemoryDatabase {
       templateId: params.templateId ?? null,
       priority: params.priority ?? "none",
       dueDate: params.dueDate ?? null,
+      startDate: params.startDate ?? null,
+      estimatedDuration: params.estimatedDuration ?? null,
+      actualDuration: params.actualDuration ?? null,
+      tags: params.tags ?? [],
+      recurring: params.recurring ?? null,
+      comments: [],
+      attachments: [],
+      pinned: params.pinned ?? false,
+      favorite: params.favorite ?? false,
       deletedAt: null,
       createdAt: now(),
       updatedAt: now(),
@@ -325,6 +373,15 @@ class MemoryDatabase {
       templateId?: string | null;
       priority?: PriorityLevel | null;
       dueDate?: string | null;
+      startDate?: string | null;
+      estimatedDuration?: number | null;
+      actualDuration?: number | null;
+      tags?: string[];
+      recurring?: "daily" | "weekly" | "monthly" | null;
+      pinned?: boolean;
+      favorite?: boolean;
+      comments?: { id: string; author: string; text: string; createdAt: string }[];
+      attachments?: { name: string; url: string; size: number }[];
     },
   ): Promise<Task | null> {
     const current = this.state.tasks.get(id);
@@ -864,14 +921,337 @@ class MemoryDatabase {
 
     return { groupsCount, tasksCount, subtasksCount };
   }
+
+  // ===== Goals =====
+  async listGoals(userId: string): Promise<Goal[]> {
+    const out: Goal[] = [];
+    for (const g of this.state.goals.values()) {
+      if (g.userId === userId) out.push(g);
+    }
+    return out.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async getGoal(id: string): Promise<Goal | null> {
+    return this.state.goals.get(id) ?? null;
+  }
+
+  async createGoal(
+    userId: string,
+    params: {
+      title: string;
+      description?: string | null;
+      targetDate?: string | null;
+      category?: string | null;
+      milestones?: string[];
+    },
+  ): Promise<Goal> {
+    const id = uid("gol");
+    const mstones = (params.milestones || []).map((mTitle) => ({
+      id: uid("mil"),
+      title: mTitle,
+      completed: false,
+    }));
+    const goal: Goal = {
+      id,
+      userId,
+      title: params.title,
+      description: params.description ?? null,
+      targetDate: params.targetDate ?? null,
+      completed: false,
+      category: params.category ?? null,
+      progress: 0,
+      milestones: mstones,
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    this.state.goals.set(id, goal);
+    await this.logActivity({
+      userId,
+      action: "created",
+      entityType: "goal",
+      entityName: params.title,
+    });
+    return goal;
+  }
+
+  async updateGoal(
+    userId: string,
+    id: string,
+    patch: {
+      title?: string;
+      description?: string | null;
+      targetDate?: string | null;
+      completed?: boolean;
+      category?: string | null;
+      progress?: number;
+      milestones?: { id: string; title: string; completed: boolean }[];
+    },
+  ): Promise<Goal | null> {
+    const current = this.state.goals.get(id);
+    if (!current || current.userId !== userId) return null;
+    const merged: Goal = { ...current, ...patch, updatedAt: now() };
+    
+    // Auto-calculate progress if milestones are provided or modified
+    if (patch.milestones) {
+      const completedCount = patch.milestones.filter((m) => m.completed).length;
+      merged.progress = patch.milestones.length > 0 ? Math.round((completedCount / patch.milestones.length) * 100) : merged.progress;
+    }
+    
+    this.state.goals.set(id, merged);
+    return merged;
+  }
+
+  async deleteGoal(userId: string, id: string): Promise<boolean> {
+    const current = this.state.goals.get(id);
+    if (!current || current.userId !== userId) return false;
+    return this.state.goals.delete(id);
+  }
+
+  // ===== Habits =====
+  async listHabits(userId: string): Promise<Habit[]> {
+    const out: Habit[] = [];
+    for (const h of this.state.habits.values()) {
+      if (h.userId === userId) out.push(h);
+    }
+    return out.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async createHabit(
+    userId: string,
+    params: { title: string; frequency: "daily" | "weekly" | "monthly" },
+  ): Promise<Habit> {
+    const id = uid("hab");
+    const habit: Habit = {
+      id,
+      userId,
+      title: params.title,
+      frequency: params.frequency,
+      history: {},
+      streak: 0,
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    this.state.habits.set(id, habit);
+    await this.logActivity({
+      userId,
+      action: "created",
+      entityType: "habit",
+      entityName: params.title,
+    });
+    return habit;
+  }
+
+  async updateHabit(
+    userId: string,
+    id: string,
+    patch: {
+      title?: string;
+      frequency?: "daily" | "weekly" | "monthly";
+      history?: Record<string, boolean>;
+      streak?: number;
+    },
+  ): Promise<Habit | null> {
+    const current = this.state.habits.get(id);
+    if (!current || current.userId !== userId) return null;
+    const merged: Habit = { ...current, ...patch, updatedAt: now() };
+    this.state.habits.set(id, merged);
+    return merged;
+  }
+
+  async toggleHabit(userId: string, id: string, date: string): Promise<Habit | null> {
+    const current = this.state.habits.get(id);
+    if (!current || current.userId !== userId) return null;
+    const newHistory = { ...current.history };
+    newHistory[date] = !newHistory[date];
+    
+    // Calculate simple streak
+    let streak = 0;
+    const today = new Date().toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+    
+    if (newHistory[today] || newHistory[yesterday]) {
+      let currentCheck = today;
+      if (!newHistory[today]) {
+        currentCheck = yesterday;
+      }
+      
+      while (newHistory[currentCheck]) {
+        streak++;
+        const nextDate = new Date(new Date(currentCheck).getTime() - 86400000)
+          .toISOString()
+          .split("T")[0];
+        currentCheck = nextDate;
+      }
+    }
+
+    const merged: Habit = {
+      ...current,
+      history: newHistory,
+      streak,
+      updatedAt: now(),
+    };
+    this.state.habits.set(id, merged);
+    return merged;
+  }
+
+  async deleteHabit(userId: string, id: string): Promise<boolean> {
+    const current = this.state.habits.get(id);
+    if (!current || current.userId !== userId) return false;
+    return this.state.habits.delete(id);
+  }
+
+  // ===== Focus Sessions =====
+  async listFocusSessions(userId: string): Promise<FocusSession[]> {
+    return this.state.focusSessions
+      .filter((s) => s.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async createFocusSession(
+    userId: string,
+    duration: number,
+    taskTitle?: string | null,
+  ): Promise<FocusSession> {
+    const session: FocusSession = {
+      id: uid("foc"),
+      userId,
+      duration,
+      taskTitle: taskTitle ?? null,
+      createdAt: now(),
+    };
+    this.state.focusSessions.push(session);
+    return session;
+  }
+
+  // ===== Notes =====
+  async listNotes(userId: string): Promise<Note[]> {
+    const out: Note[] = [];
+    for (const n of this.state.notes.values()) {
+      if (n.userId === userId) out.push(n);
+    }
+    return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  async getNote(id: string): Promise<Note | null> {
+    return this.state.notes.get(id) ?? null;
+  }
+
+  async createNote(
+    userId: string,
+    params: { title: string; content: string; tags?: string[] },
+  ): Promise<Note> {
+    const id = uid("not");
+    const note: Note = {
+      id,
+      userId,
+      title: params.title,
+      content: params.content,
+      tags: params.tags ?? [],
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    this.state.notes.set(id, note);
+    await this.logActivity({
+      userId,
+      action: "created",
+      entityType: "note",
+      entityName: params.title,
+    });
+    return note;
+  }
+
+  async updateNote(
+    userId: string,
+    id: string,
+    patch: { title?: string; content?: string; tags?: string[] },
+  ): Promise<Note | null> {
+    const current = this.state.notes.get(id);
+    if (!current || current.userId !== userId) return null;
+    const merged: Note = { ...current, ...patch, updatedAt: now() };
+    this.state.notes.set(id, merged);
+    return merged;
+  }
+
+  async deleteNote(userId: string, id: string): Promise<boolean> {
+    const current = this.state.notes.get(id);
+    if (!current || current.userId !== userId) return false;
+    return this.state.notes.delete(id);
+  }
+
+  // ===== Journal Entries =====
+  async listJournal(userId: string): Promise<JournalEntry[]> {
+    const out: JournalEntry[] = [];
+    for (const j of this.state.journalEntries.values()) {
+      if (j.userId === userId) out.push(j);
+    }
+    return out.sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  async getJournal(userId: string, date: string): Promise<JournalEntry | null> {
+    for (const j of this.state.journalEntries.values()) {
+      if (j.userId === userId && j.date === date) return j;
+    }
+    return null;
+  }
+
+  async saveJournal(
+    userId: string,
+    date: string,
+    params: {
+      mood: "great" | "good" | "okay" | "bad" | "terrible";
+      gratitude: string;
+      reflection: string;
+    },
+  ): Promise<JournalEntry> {
+    let existing: JournalEntry | null = null;
+    for (const j of this.state.journalEntries.values()) {
+      if (j.userId === userId && j.date === date) {
+        existing = j;
+        break;
+      }
+    }
+
+    if (existing) {
+      const updated: JournalEntry = {
+        ...existing,
+        ...params,
+        updatedAt: now(),
+      };
+      this.state.journalEntries.set(existing.id, updated);
+      return updated;
+    }
+
+    const id = uid("jou");
+    const entry: JournalEntry = {
+      id,
+      userId,
+      date,
+      ...params,
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    this.state.journalEntries.set(id, entry);
+    await this.logActivity({
+      userId,
+      action: "created",
+      entityType: "journal",
+      entityName: `reflection for ${date}`,
+    });
+    return entry;
+  }
 }
 
-let db: MemoryDatabase | null = null;
+let db: MemoryDatabase | PostgresDatabase | null = null;
 
-export function getDb(): MemoryDatabase {
+export function getDb(): MemoryDatabase | PostgresDatabase {
   if (!db) {
-    db = new MemoryDatabase();
-    console.log("[SimplLife DB] Using in-memory database store.");
+    if (config.hasDatabase) {
+      db = new PostgresDatabase();
+      console.log("[SimplLife DB] Using Postgres database store.");
+    } else {
+      db = new MemoryDatabase();
+      console.log("[SimplLife DB] Using in-memory database store (Demo Mode).");
+    }
   }
   return db;
 }

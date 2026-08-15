@@ -14,6 +14,12 @@ export interface Group {
   userId: string;
   name: string;
   order: number;
+  description: string | null;
+  coverImage: string | null;
+  color: string | null;
+  icon: string | null;
+  archived: boolean;
+  favorite: boolean;
   deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -41,10 +47,73 @@ export interface Task {
   templateId: string | null;
   priority?: PriorityLevel | null;
   dueDate?: string | null;
+  startDate?: string | null;
+  estimatedDuration?: number | null; // in minutes
+  actualDuration?: number | null; // in minutes
+  tags?: string[];
+  recurring?: "daily" | "weekly" | "monthly" | null;
+  comments?: { id: string; author: string; text: string; createdAt: string }[];
+  attachments?: { name: string; url: string; size: number }[];
+  pinned?: boolean;
+  favorite?: boolean;
   deletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   subtasks: Subtask[];
+}
+
+export interface Goal {
+  id: string;
+  userId: string;
+  title: string;
+  description: string | null;
+  targetDate: string | null;
+  completed: boolean;
+  category: string | null;
+  progress: number; // percentage 0 to 100
+  milestones: { id: string; title: string; completed: boolean }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Habit {
+  id: string;
+  userId: string;
+  title: string;
+  frequency: "daily" | "weekly" | "monthly";
+  history: Record<string, boolean>; // YYYY-MM-DD -> completed
+  streak: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FocusSession {
+  id: string;
+  userId: string;
+  duration: number; // in minutes
+  taskTitle?: string | null;
+  createdAt: string;
+}
+
+export interface Note {
+  id: string;
+  userId: string;
+  title: string;
+  content: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JournalEntry {
+  id: string;
+  userId: string;
+  date: string; // YYYY-MM-DD
+  mood: "great" | "good" | "okay" | "bad" | "terrible";
+  gratitude: string;
+  reflection: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TemplateSubtaskDef {
@@ -66,10 +135,41 @@ export interface ActivityLog {
   id: string;
   userId: string;
   action: string;
-  entityType: "group" | "task" | "subtask" | "template" | "user";
+  entityType: "group" | "task" | "subtask" | "template" | "user" | "goal" | "habit" | "note" | "journal";
   entityName: string;
   detail: string | null;
   createdAt: string;
+}
+
+// ================= Enterprise Types =================
+export type Role = "owner" | "admin" | "manager" | "member" | "guest" | "viewer";
+
+export interface Organization {
+  id: string;
+  name: string;
+  domain?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Workspace {
+  id: string;
+  organizationId: string;
+  name: string;
+  type: "personal" | "shared" | "team" | "organization" | "enterprise";
+  branding?: {
+    logoUrl?: string;
+    primaryColor?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkspaceMembership {
+  workspaceId: string;
+  userId: string;
+  role: Role;
+  joinedAt: string;
 }
 
 export interface TrashData {
@@ -83,8 +183,23 @@ export interface AuthResponse {
   user: User;
 }
 
-export interface CreateGroupRequest { name: string; }
-export interface UpdateGroupRequest { name?: string; }
+export interface CreateGroupRequest {
+  name: string;
+  description?: string;
+  coverImage?: string;
+  color?: string;
+  icon?: string;
+}
+
+export interface UpdateGroupRequest {
+  name?: string;
+  description?: string | null;
+  coverImage?: string | null;
+  color?: string | null;
+  icon?: string | null;
+  archived?: boolean;
+  favorite?: boolean;
+}
 
 export interface CreateTaskRequest {
   title: string;
@@ -93,6 +208,13 @@ export interface CreateTaskRequest {
   templateId?: string | null;
   priority?: PriorityLevel | null;
   dueDate?: string | null;
+  startDate?: string | null;
+  estimatedDuration?: number | null;
+  actualDuration?: number | null;
+  tags?: string[];
+  recurring?: "daily" | "weekly" | "monthly" | null;
+  pinned?: boolean;
+  favorite?: boolean;
 }
 
 export interface UpdateTaskRequest {
@@ -103,6 +225,15 @@ export interface UpdateTaskRequest {
   templateId?: string | null;
   priority?: PriorityLevel | null;
   dueDate?: string | null;
+  startDate?: string | null;
+  estimatedDuration?: number | null;
+  actualDuration?: number | null;
+  tags?: string[];
+  recurring?: "daily" | "weekly" | "monthly" | null;
+  pinned?: boolean;
+  favorite?: boolean;
+  comments?: { id: string; author: string; text: string; createdAt: string }[];
+  attachments?: { name: string; url: string; size: number }[];
 }
 
 export interface CreateSubtaskRequest {
@@ -146,4 +277,3 @@ export interface ExportData {
     }[];
   }[];
 }
-

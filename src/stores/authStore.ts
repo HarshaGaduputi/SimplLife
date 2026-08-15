@@ -1,10 +1,9 @@
 import { create } from "zustand";
-import { api, setToken, getToken, HttpError } from "../lib/api";
+import { authService, HttpError } from "../services/api";
 import type { User } from "../../shared/types";
 
 interface AuthState {
   user: User | null;
-  token: string | null;
   loading: boolean;
   hydrated: boolean;
   error: string | null;
@@ -22,9 +21,8 @@ interface AuthState {
   clearError: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  token: null,
   loading: false,
   hydrated: false,
   error: null,
@@ -36,9 +34,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signUp: async (payload) => {
     set({ loading: true, error: null });
     try {
-      const res = await api.register(payload);
-      setToken(res.token);
-      set({ user: res.user, token: res.token, loading: false, hydrated: true });
+      const res = await authService.register(payload);
+      set({ user: res.user, loading: false, hydrated: true });
       return { success: true as const };
     } catch (e) {
       const err = e as HttpError;
@@ -54,9 +51,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signIn: async (payload) => {
     set({ loading: true, error: null });
     try {
-      const res = await api.login(payload);
-      setToken(res.token);
-      set({ user: res.user, token: res.token, loading: false, hydrated: true });
+      const res = await authService.login(payload);
+      set({ user: res.user, loading: false, hydrated: true });
       return { success: true as const };
     } catch (e) {
       const err = e as HttpError;
@@ -69,25 +65,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  signOut: () => {
-    setToken(null);
-    set({ user: null, token: null, error: null });
+  signOut: async () => {
+    try {
+      await authService.logout();
+    } catch {
+      // ignore
+    }
+    set({ user: null, error: null });
   },
 
   hydrate: async () => {
-    const token = getToken();
-    if (!token) {
-      set({ hydrated: true, user: null, token: null });
-      return;
-    }
-    set({ token, loading: true });
+    set({ loading: true });
     try {
-      const res = await api.me();
+      const res = await authService.me();
       set({ user: res.user, hydrated: true, loading: false });
     } catch {
-      setToken(null);
-      set({ user: null, token: null, hydrated: true, loading: false });
+      set({ user: null, hydrated: true, loading: false });
     }
-    void get;
   },
 }));
