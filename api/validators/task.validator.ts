@@ -16,6 +16,7 @@ export const UpdateTaskSchema = z.object({
   templateId: z.string().nullable().optional(),
   priority: z.enum(["high", "medium", "low", "none"]).nullable().optional(),
   dueDate: z.string().nullable().optional(),
+  goalId: z.string().nullable().optional(),
 });
 
 export const CreateSubtaskSchema = z.object({

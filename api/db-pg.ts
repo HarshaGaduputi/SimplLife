@@ -87,6 +87,7 @@ export class PostgresDatabase {
       templateId: row.template_id,
       priority: row.priority,
       dueDate: row.due_date?.toISOString() || null,
+      goalId: row.goal_id || null,
       startDate: row.start_date?.toISOString() || null,
       estimatedDuration: row.estimated_duration,
       actualDuration: row.actual_duration,
@@ -382,6 +383,7 @@ export class PostgresDatabase {
     recurring?: "daily" | "weekly" | "monthly" | null;
     pinned?: boolean;
     favorite?: boolean;
+    goalId?: string | null;
   }): Promise<Task> {
     const group = await this.getGroup(params.groupId);
     if (!group) throw new Error("Group not found");
@@ -397,15 +399,15 @@ export class PostgresDatabase {
       INSERT INTO tasks (
         id, group_id, user_id, title, description, position, template_id, priority,
         due_date, start_date, estimated_duration, actual_duration, tags, recurring,
-        pinned, favorite
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        pinned, favorite, goal_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING *
     `, [
       id, params.groupId, group.userId, params.title, params.description || null,
       order, params.templateId || null, params.priority || 'none',
       params.dueDate || null, params.startDate || null, params.estimatedDuration || null,
       params.actualDuration || null, params.tags || '{}', params.recurring || null,
-      params.pinned || false, params.favorite || false
+      params.pinned || false, params.favorite || false, params.goalId || null
     ]);
 
     await this.logActivity({
@@ -437,6 +439,7 @@ export class PostgresDatabase {
     if (patch.templateId !== undefined) { updates.push(`template_id = $${i++}`); params.push(patch.templateId); }
     if (patch.priority !== undefined) { updates.push(`priority = $${i++}`); params.push(patch.priority); }
     if (patch.dueDate !== undefined) { updates.push(`due_date = $${i++}`); params.push(patch.dueDate); }
+    if (patch.goalId !== undefined) { updates.push(`goal_id = $${i++}`); params.push(patch.goalId); }
     if (patch.startDate !== undefined) { updates.push(`start_date = $${i++}`); params.push(patch.startDate); }
     if (patch.estimatedDuration !== undefined) { updates.push(`estimated_duration = $${i++}`); params.push(patch.estimatedDuration); }
     if (patch.actualDuration !== undefined) { updates.push(`actual_duration = $${i++}`); params.push(patch.actualDuration); }
@@ -945,5 +948,74 @@ export class PostgresDatabase {
   // ===== Contact =====
   async createContactMessage(params: any): Promise<void> {
     // Log or store in separate table
+  }
+
+  // ===== Analytics =====
+  async getAnalytics(userId: string): Promise<any> {
+    // Fetch stats in efficient queries instead of fetching all entities
+    const [tasksStats, focusStats, goalsStats, habitsStats, completedTasksHistory] = await Promise.all([
+      // Tasks completion
+      this.queryOne(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN completed = TRUE THEN 1 ELSE 0 END) as completed
+        FROM tasks WHERE user_id = $1 AND deleted_at IS NULL
+      `, [userId]),
+      // Focus sessions total duration
+      this.queryOne(`
+        SELECT SUM(duration) as total_duration
+        FROM focus_sessions WHERE user_id = $1
+      `, [userId]),
+      // Goals completion
+      this.queryOne(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN completed = TRUE THEN 1 ELSE 0 END) as completed
+        FROM goals WHERE user_id = $1
+      `, [userId]),
+      // Habits stats
+      this.queryOne(`
+        SELECT 
+          COUNT(*) as active_count,
+          MAX(streak) as best_streak
+        FROM habits WHERE user_id = $1
+      `, [userId]),
+      // Last 28 days tasks completion for heatmap and weekly bar chart
+      this.query(`
+        SELECT DATE(COALESCE(completed_at, updated_at)) as date_val, COUNT(*) as count
+        FROM tasks
+        WHERE user_id = $1 AND completed = TRUE AND deleted_at IS NULL
+        GROUP BY date_val
+        ORDER BY date_val DESC
+        LIMIT 60
+      `, [userId])
+    ]);
+
+    const completedTasksCountByDate: Record<string, number> = {};
+    for (const row of completedTasksHistory) {
+      if (row.date_val) {
+        // formatting as YYYY-MM-DD
+        const dateObj = new Date(row.date_val);
+        const yyyy = dateObj.getFullYear();
+        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(dateObj.getDate()).padStart(2, '0');
+        completedTasksCountByDate[`${yyyy}-${mm}-${dd}`] = parseInt(row.count, 10);
+      }
+    }
+
+    const completedTasks = parseInt(tasksStats?.completed || '0', 10);
+    const totalTasks = parseInt(tasksStats?.total || '0', 10);
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    return {
+      completedTasks,
+      completionRate,
+      totalFocusMinutes: parseInt(focusStats?.total_duration || '0', 10),
+      completedGoals: parseInt(goalsStats?.completed || '0', 10),
+      totalGoals: parseInt(goalsStats?.total || '0', 10),
+      activeHabitsCount: parseInt(habitsStats?.active_count || '0', 10),
+      bestStreak: parseInt(habitsStats?.best_streak || '0', 10),
+      completedTasksCountByDate,
+    };
   }
 }

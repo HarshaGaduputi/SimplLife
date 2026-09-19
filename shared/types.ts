@@ -47,6 +47,7 @@ export interface Task {
   templateId: string | null;
   priority?: PriorityLevel | null;
   dueDate?: string | null;
+  goalId?: string | null;
   startDate?: string | null;
   estimatedDuration?: number | null; // in minutes
   actualDuration?: number | null; // in minutes

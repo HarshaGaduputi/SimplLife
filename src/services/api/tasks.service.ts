@@ -18,6 +18,7 @@ export type TaskCreatePayload = {
   templateId?: string | null;
   priority?: PriorityLevel | null;
   dueDate?: string | null;
+  goalId?: string | null;
 };
 
 export type TaskUpdatePayload = {
@@ -28,6 +29,7 @@ export type TaskUpdatePayload = {
   templateId?: string | null;
   priority?: PriorityLevel | null;
   dueDate?: string | null;
+  goalId?: string | null;
 };
 
 export const tasksService = {

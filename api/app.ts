@@ -26,6 +26,7 @@ import journalRoutes from "./routes/journal.routes.js";
 import aiRoutes from "./routes/ai.routes.js";
 import calendarRoutes from "./routes/calendar.routes.js";
 import activityRoutes from "./routes/activity.routes.js";
+import analyticsRoutes from "./routes/analytics.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { config } from "./config/index.js";
 
@@ -105,6 +106,7 @@ app.use("/api/journal", journalRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/activity", activityRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 
 

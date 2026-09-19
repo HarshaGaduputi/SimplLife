@@ -1,15 +1,11 @@
 import { useEffect, useState } from "react";
 import { BarChart2, CheckSquare, Clock, Flame, Calendar, Target, ShieldAlert } from "lucide-react";
-import { tasksService, habitsService, focusService, goalsService, aiApiService } from "@/services/api";
-import type { Task, Habit, FocusSession, Goal } from "../../../shared/types";
+import { analyticsService, aiApiService } from "@/services/api";
 import { Card, Badge, Loader } from "@/components/ui";
 
 export function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [habits, setHabits] = useState<Habit[]>([]);
-  const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const [metrics, setMetrics] = useState<any>(null);
 
   // AI insights state variables
   const [habitAdvice, setHabitAdvice] = useState<string | null>(null);
@@ -19,16 +15,8 @@ export function AnalyticsPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const habitsRes = await habitsService.list();
-        const focusRes = await focusService.list();
-        const goalsRes = await goalsService.list();
-        
-        setHabits(habitsRes.habits);
-        setFocusSessions(focusRes.sessions);
-        setGoals(goalsRes.goals);
-
-        const tasksRes = await tasksService.listAll();
-        setTasks(tasksRes.tasks || []);
+        const res = await analyticsService.get();
+        setMetrics(res);
 
         // Load AI Insights in parallel after other awaits succeed
         setAiLoading(true);
@@ -58,26 +46,14 @@ export function AnalyticsPage() {
     void loadData();
   }, []);
 
-  // Compute Metrics (No fabricated defaults, fallback to 0)
-  const completedTasks = tasks.filter((t) => t.completed).length;
-  const completionRate = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
-  const totalFocusMinutes = focusSessions.reduce((acc, curr) => acc + curr.duration, 0) || 0;
-  const completedGoals = goals.filter((g) => g.completed).length || 0;
-  const activeHabitsCount = habits.length || 0;
-  const bestStreak = habits.length > 0 ? Math.max(...habits.map((h) => h.streak)) : 0;
-
-  // Group completed tasks by date string YYYY-MM-DD in browser's local timezone
-  const completedTasksCountByDate: Record<string, number> = {};
-  for (const t of tasks) {
-    if (t.completed) {
-      const dateVal = t.completedAt ? new Date(t.completedAt) : new Date(t.updatedAt);
-      const yyyy = dateVal.getFullYear();
-      const mm = String(dateVal.getMonth() + 1).padStart(2, '0');
-      const dd = String(dateVal.getDate()).padStart(2, '0');
-      const localDateStr = `${yyyy}-${mm}-${dd}`;
-      completedTasksCountByDate[localDateStr] = (completedTasksCountByDate[localDateStr] || 0) + 1;
-    }
-  }
+  const completedTasks = metrics?.completedTasks || 0;
+  const completionRate = metrics?.completionRate || 0;
+  const totalFocusMinutes = metrics?.totalFocusMinutes || 0;
+  const completedGoals = metrics?.completedGoals || 0;
+  const totalGoals = metrics?.totalGoals || 0;
+  const activeHabitsCount = metrics?.activeHabitsCount || 0;
+  const bestStreak = metrics?.bestStreak || 0;
+  const completedTasksCountByDate = metrics?.completedTasksCountByDate || {};
 
   // Heatmap Grid for the last 28 days (oldest first, today is the last cell)
   const dates: Date[] = [];
