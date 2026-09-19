@@ -48,7 +48,7 @@ async function buildContext(userId: string) {
 
 // ── GET /api/ai/status ───────────────────────────────────────────────────────
 router.get('/status', (req, res) => {
-  res.json({ success: true, configured: !!config.openai.apiKey });
+  res.json({ success: true, configured: !!config.ai.apiKey });
 });
 
 // ── POST /api/ai/chat ────────────────────────────────────────────────────────

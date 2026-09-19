@@ -156,34 +156,13 @@ export function DashboardPage() {
     }
   }
 
-  const debouncedSync = useCallback(() => {
-    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-    syncTimeoutRef.current = setTimeout(async () => {
-      try {
-        const currentGroups = useTasksStore.getState().groups;
-        const currentTasksByGroup = useTasksStore.getState().tasksByGroup;
-        const groupsToSync = currentGroups.map((g) => ({
-          ...g,
-          tasks: currentTasksByGroup[g.id] || [],
-        }));
-        await stateService.sync(groupsToSync);
-      } catch {
-        /* ignore sync error */
-      }
-    }, 500);
-  }, []);
-
   const handleUndo = useCallback(() => {
-    if (!undo()) return;
-    toast({ kind: "info", message: "Undo" });
-    debouncedSync();
-  }, [undo, toast, debouncedSync]);
+    toast({ kind: "info", message: "Undo is currently disabled in cloud mode." });
+  }, [toast]);
 
   const handleRedo = useCallback(() => {
-    if (!redo()) return;
-    toast({ kind: "info", message: "Redo" });
-    debouncedSync();
-  }, [redo, toast, debouncedSync]);
+    toast({ kind: "info", message: "Redo is currently disabled in cloud mode." });
+  }, [toast]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -191,18 +170,18 @@ export function DashboardPage() {
       if (!meta) return;
       if (e.key.toLowerCase() === "z" && !e.shiftKey) {
         e.preventDefault();
-        void handleUndo();
+        handleUndo();
       } else if (
         (e.key.toLowerCase() === "z" && e.shiftKey) ||
         e.key.toLowerCase() === "y"
       ) {
         e.preventDefault();
-        void handleRedo();
+        handleRedo();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [canUndo, canRedo, handleUndo, handleRedo]);
+  }, [handleUndo, handleRedo]);
 
   const todayStr = new Date().toISOString().split("T")[0];
 

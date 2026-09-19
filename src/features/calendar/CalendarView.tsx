@@ -17,7 +17,7 @@ export function CalendarView() {
   const [showDayModal, setShowDayModal] = useState(false);
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventTime, setNewEventTime] = useState("09:00");
-  const [newEventType, setNewEventType] = useState<"event" | "deadline">("event");
+  const [newEventType, setNewEventType] = useState<"event" | "task_deadline" | "schedule">("event");
   
   const { events: dbEvents, fetchEvents, createEvent, deleteEvent } = useCalendarStore();
 
@@ -255,11 +255,13 @@ export function CalendarView() {
                         className="rounded-lg p-1 text-xs border border-border-subtle truncate flex items-center gap-1 bg-surface-alt"
                         title={`${ev.startTime || ''} - ${ev.title}`}
                       >
-                        <span
-                          className={`h-2 w-2 rounded-full shrink-0 ${
-                            ev.type === "deadline" ? "bg-danger" : "bg-info"
-                          }`}
-                        />
+                        {ev.type === "task_deadline" ? (
+                          <Flag size={12} className="text-[var(--color-warning)] shrink-0" />
+                        ) : ev.type === "schedule" ? (
+                          <Clock size={12} className="text-[var(--color-primary)] shrink-0" />
+                        ) : (
+                          <span className="h-2 w-2 rounded-full bg-[var(--color-primary)] shrink-0" />
+                        )}
                         <span className="truncate flex-1 font-medium text-[var(--color-text-strong)]">{ev.title}</span>
                       </div>
                     ))}
@@ -271,7 +273,7 @@ export function CalendarView() {
                       <span key={t.id} className="h-1.5 w-1.5 rounded-full bg-warning" title={t.title} />
                     ))}
                     {dayEvents.map(ev => (
-                      <span key={ev.id} className={`h-1.5 w-1.5 rounded-full ${ev.type === "deadline" ? "bg-danger" : "bg-info"}`} title={ev.title} />
+                      <span key={ev.id} className={`h-1.5 w-1.5 rounded-full ${ev.type === "task_deadline" ? "bg-danger" : ev.type === "schedule" ? "bg-primary" : "bg-info"}`} title={ev.title} />
                     ))}
                     {(dayTasks.length + dayEvents.length) > 4 && (
                       <span className="text-[9px] text-[var(--color-text-muted)]">+{((dayTasks.length + dayEvents.length) - 4)}</span>
@@ -317,8 +319,8 @@ export function CalendarView() {
                 {(calendarEventsByDate[selectedDay] || []).map(ev => (
                   <div key={ev.id} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--color-surface-alt)] text-sm">
                     <span className="text-[var(--color-text-muted)] w-12 shrink-0 text-xs">{ev.startTime}</span>
-                    <span className={`flex-1 text-[var(--color-text-strong)] ${ev.type === "deadline" ? "text-[var(--color-danger)]" : ""}`}>{ev.title}</span>
-                    {ev.type === "deadline" ? <Flag size={12} className="text-[var(--color-danger)]" /> : <Clock size={12} className="text-[var(--color-primary)]" />}
+                    <span className={`flex-1 text-[var(--color-text-strong)] ${ev.type === "task_deadline" ? "text-[var(--color-danger)]" : ""}`}>{ev.title}</span>
+                    {ev.type === "task_deadline" ? <Flag size={12} className="text-[var(--color-danger)]" /> : ev.type === "schedule" ? <Clock size={12} className="text-[var(--color-primary)]" /> : <div className="h-2 w-2 rounded-full bg-[var(--color-primary)]" />}
                     <button onClick={() => handleDeleteEvent(selectedDay, ev.id)} className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"><X size={14} /></button>
                   </div>
                 ))}
@@ -345,11 +347,12 @@ export function CalendarView() {
                 />
                 <select
                   value={newEventType}
-                  onChange={e => setNewEventType(e.target.value as "event" | "deadline")}
+                  onChange={e => setNewEventType(e.target.value as "event" | "task_deadline" | "schedule")}
                   className="flex-1 px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-alt)] text-[var(--color-text-strong)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 >
                   <option value="event">Event</option>
-                  <option value="deadline">Deadline</option>
+                  <option value="task_deadline">Deadline</option>
+                  <option value="schedule">Time Block</option>
                 </select>
               </div>
               <button

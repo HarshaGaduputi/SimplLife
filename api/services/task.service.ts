@@ -160,7 +160,7 @@ export class TaskService {
     }
 
     let subtaskNames: string[] = [];
-    const apiKey = config.openai.apiKey;
+    const apiKey = config.ai.apiKey;
 
     if (apiKey) {
       try {
