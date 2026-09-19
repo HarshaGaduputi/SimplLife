@@ -10,7 +10,6 @@ export { notesService } from "./notes.service";
 export { journalService } from "./journal.service";
 export { aiApiService } from "./ai.service";
 export { calendarService } from "./calendar.service";
-export { activityService } from "./activity.service";
 export { analyticsService } from "./analytics.service";
 
 import type { ActivityLog, ExportData, TrashData, Task } from "../../../shared/types";

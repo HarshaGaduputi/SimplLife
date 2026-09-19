@@ -17,8 +17,12 @@ function readTheme(): ThemeMode {
     if (root.classList.contains("theme-light")) return "light";
     const stored = localStorage.getItem(THEME_KEY);
     if (stored === "dark" || stored === "light") return stored;
+    // Fallback to system preference if no stored theme
+    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      return "dark";
+    }
   }
-  return "dark"; // Default to dark initially
+  return "light"; // Default to light if system is light or unavailable
 }
 
 function applyTheme(theme: ThemeMode): void {

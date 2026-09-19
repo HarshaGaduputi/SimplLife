@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { calendarService } from "../services/api/index.js";
 import type { CalendarEvent } from "../../shared/types.js";
-import { toastStore } from "./toastStore.js";
+import { useToastStore } from "./toastStore";
 
 interface CalendarState {
   events: CalendarEvent[];
@@ -26,9 +26,9 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       set({ events, initialized: true, loading: false });
     } catch (err: any) {
       set({ loading: false });
-      toastStore.getState().addToast({
-        title: "Error fetching events",
-        type: "error",
+      useToastStore.getState().toast({
+        message: "Error fetching events",
+        kind: "error",
       });
     }
   },
@@ -39,9 +39,9 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       set((state) => ({ events: [...state.events, newEvent] }));
       return newEvent;
     } catch (err: any) {
-      toastStore.getState().addToast({
-        title: "Error creating event",
-        type: "error",
+      useToastStore.getState().toast({
+        message: "Error creating event",
+        kind: "error",
       });
     }
   },
@@ -53,9 +53,9 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
         events: state.events.map((e) => (e.id === id ? updated : e)),
       }));
     } catch (err: any) {
-      toastStore.getState().addToast({
-        title: "Error updating event",
-        type: "error",
+      useToastStore.getState().toast({
+        message: "Error updating event",
+        kind: "error",
       });
     }
   },
@@ -67,9 +67,9 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
         events: state.events.filter((e) => e.id !== id),
       }));
     } catch (err: any) {
-      toastStore.getState().addToast({
-        title: "Error deleting event",
-        type: "error",
+      useToastStore.getState().toast({
+        message: "Error deleting event",
+        kind: "error",
       });
     }
   },

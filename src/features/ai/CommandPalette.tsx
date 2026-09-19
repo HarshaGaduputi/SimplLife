@@ -5,7 +5,8 @@ import {
   BookOpen, BarChart2, Settings, Zap, ArrowRight
 } from "lucide-react";
 import { useTasksStore } from "@/stores/tasksStore";
-import { notesService, habitsService } from "@/services/api";
+import { notesService, habitsService, tasksService } from "@/services/api";
+import { Plus } from "lucide-react";
 
 interface Command {
   id: string;
@@ -30,6 +31,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
   const groups = useTasksStore(s => s.groups);
   const tasksByGroup = useTasksStore(s => s.tasksByGroup);
+  const addTask = useTasksStore(s => s.addTask);
 
   const commands: Command[] = [
     {
@@ -115,7 +117,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
   const allItems = [...commands, ...searchResults];
 
-  const filtered = query.trim()
+  let filtered = query.trim()
     ? allItems.filter(
         (c) =>
           c.label.toLowerCase().includes(query.toLowerCase()) ||
@@ -123,6 +125,32 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
           c.keywords?.some((k) => k.toLowerCase().includes(query.toLowerCase())),
       )
     : commands;
+
+  // QUICK CAPTURE LOGIC
+  // If the query is long enough, offer to create it as a task.
+  if (query.trim().length > 2) {
+    const defaultGroup = groups[0]?.id;
+    if (defaultGroup) {
+      const quickCaptureCommand: Command = {
+        id: "quick-capture",
+        label: `Create task: "${query.trim()}"`,
+        description: "Quick capture to your first group",
+        icon: <Plus size={16} className="text-success" />,
+        action: async () => {
+          try {
+            await tasksService.create(defaultGroup, { title: query.trim() });
+            const full = await tasksService.list(defaultGroup);
+            useTasksStore.getState().setTasks(defaultGroup, full.tasks);
+          } catch (e) {
+            console.error(e);
+          }
+          onClose();
+        },
+      };
+      // Prepend quick capture to the top of the filtered list
+      filtered = [quickCaptureCommand, ...filtered];
+    }
+  }
 
   useEffect(() => {
     if (open) {

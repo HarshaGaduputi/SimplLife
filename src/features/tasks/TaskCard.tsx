@@ -15,6 +15,7 @@ import { tasksService, trashService, HttpError } from "../../services/api";
 import { useTasksStore } from "../../stores/tasksStore";
 import { useUIStore } from "../../stores/uiStore";
 import { useToastStore } from "../../stores/toastStore";
+import { calculateTaskRisk } from "../dashboard/taskRisk";
 
 export function TaskCard({
   groupId,
@@ -291,6 +292,12 @@ export function TaskCard({
           borderColor: "var(--color-border-subtle)",
         };
 
+  const risk = calculateTaskRisk(task);
+  const riskColor = 
+    risk.level === "high" ? "var(--color-danger)" : 
+    risk.level === "medium" ? "var(--color-warning)" : 
+    "var(--color-text-muted)";
+
   const subs = task.subtasks || [];
   void indexHint;
 
@@ -428,6 +435,21 @@ export function TaskCard({
                 style={dueDateChipStyle}
               />
             </div>
+
+            {/* Task Risk Badge */}
+            {!task.completed && risk.level !== "none" && risk.level !== "low" && (
+              <div 
+                className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border"
+                style={{ 
+                  color: riskColor, 
+                  borderColor: `color-mix(in srgb, ${riskColor} 40%, transparent)`,
+                  backgroundColor: `color-mix(in srgb, ${riskColor} 10%, transparent)`
+                }}
+                title={risk.reason}
+              >
+                {risk.level === "high" ? "At Risk" : "Review"}
+              </div>
+            )}
           </div>
 
           {editingTitle ? (

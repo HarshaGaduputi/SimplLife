@@ -1256,6 +1256,20 @@ class MemoryDatabase {
     });
     return entry;
   }
+
+  async getAnalytics(userId: string): Promise<any> {
+    return {
+      completedTasks: 0,
+      completionRate: 0,
+      totalFocusMinutes: 0,
+      completedGoals: 0,
+      totalGoals: 0,
+      activeHabitsCount: 0,
+      bestStreak: 0,
+      completedTasksCountByDate: {}
+    };
+  }
+
 }
 
 let db: MemoryDatabase | PostgresDatabase | null = null;

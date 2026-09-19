@@ -15,6 +15,7 @@ import type {
   JournalEntry,
   Template,
   TrashData,
+  CalendarEvent,
 } from "../shared/types.js";
 
 const { Pool } = pg;
@@ -299,7 +300,7 @@ export class PostgresDatabase {
         action: 'renamed',
         entityType: 'group',
         entityName: patch.name,
-        detail: \`renamed from '\${current.name}' to '\${patch.name}'\`
+        detail: `renamed from '${current.name}' to '${patch.name}'`
       });
     }
     
@@ -417,7 +418,7 @@ export class PostgresDatabase {
       action: 'created',
       entityType: 'task',
       entityName: params.title,
-      detail: \`added to group '\${group.name}'\`
+      detail: `added to group '${group.name}'`
     });
     
     return await this.hydrateTask(this.mapTask(row));
@@ -464,7 +465,7 @@ export class PostgresDatabase {
         if (patch.completed !== undefined && patch.completed !== current.completed) {
           await this.logActivity({ userId, action: patch.completed ? 'completed' : 'uncompleted', entityType: 'task', entityName: current.title });
         } else if (patch.title && patch.title !== current.title) {
-          await this.logActivity({ userId, action: 'renamed', entityType: 'task', entityName: patch.title, detail: \`renamed to '\${patch.title}'\` });
+          await this.logActivity({ userId, action: 'renamed', entityType: 'task', entityName: patch.title, detail: `renamed to '${patch.title}'` });
         }
       }
     }
@@ -617,6 +618,36 @@ export class PostgresDatabase {
     let table = type === 'group' ? 'groups' : type === 'task' ? 'tasks' : 'subtasks';
     const res = await this.query(`DELETE FROM ${table} WHERE id = $1 RETURNING id`, [id]);
     return res.length > 0;
+  }
+
+  async autoEmptyTrashOlderThanDays(days = 30): Promise<number> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const dateStr = cutoff.toISOString();
+
+    let count = 0;
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      const st = await client.query(`DELETE FROM subtasks WHERE deleted_at < $1`, [dateStr]);
+      count += st.rowCount || 0;
+      
+      const t = await client.query(`DELETE FROM tasks WHERE deleted_at < $1`, [dateStr]);
+      count += t.rowCount || 0;
+      
+      const g = await client.query(`DELETE FROM groups WHERE deleted_at < $1`, [dateStr]);
+      count += g.rowCount || 0;
+
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+    
+    return count;
   }
 
   // ===== Export/Import =====
@@ -996,28 +1027,33 @@ export class PostgresDatabase {
 
     const completedTasksCountByDate: Record<string, number> = {};
     for (const row of completedTasksHistory) {
-      if (row.date_val) {
+      if ((row as any).date_val) {
         // formatting as YYYY-MM-DD
-        const dateObj = new Date(row.date_val);
+        const dateObj = new Date((row as any).date_val);
         const yyyy = dateObj.getFullYear();
         const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
         const dd = String(dateObj.getDate()).padStart(2, '0');
-        completedTasksCountByDate[`${yyyy}-${mm}-${dd}`] = parseInt(row.count, 10);
+        completedTasksCountByDate[`${yyyy}-${mm}-${dd}`] = parseInt((row as any).count, 10);
       }
     }
 
-    const completedTasks = parseInt(tasksStats?.completed || '0', 10);
-    const totalTasks = parseInt(tasksStats?.total || '0', 10);
+    const tStats = tasksStats as any;
+    const fStats = focusStats as any;
+    const gStats = goalsStats as any;
+    const hStats = habitsStats as any;
+
+    const completedTasks = parseInt(tStats?.completed || '0', 10);
+    const totalTasks = parseInt(tStats?.total || '0', 10);
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
     return {
       completedTasks,
       completionRate,
-      totalFocusMinutes: parseInt(focusStats?.total_duration || '0', 10),
-      completedGoals: parseInt(goalsStats?.completed || '0', 10),
-      totalGoals: parseInt(goalsStats?.total || '0', 10),
-      activeHabitsCount: parseInt(habitsStats?.active_count || '0', 10),
-      bestStreak: parseInt(habitsStats?.best_streak || '0', 10),
+      totalFocusMinutes: parseInt(fStats?.total_duration || '0', 10),
+      completedGoals: parseInt(gStats?.completed || '0', 10),
+      totalGoals: parseInt(gStats?.total || '0', 10),
+      activeHabitsCount: parseInt(hStats?.active_count || '0', 10),
+      bestStreak: parseInt(hStats?.best_streak || '0', 10),
       completedTasksCountByDate,
     };
   }

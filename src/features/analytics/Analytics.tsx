@@ -152,7 +152,7 @@ export function AnalyticsPage() {
               <div>
                 <span className="text-xs font-bold text-text-muted uppercase tracking-wider block">Focus Logged</span>
                 <span className="text-2xl font-bold text-text-strong block mt-0.5">{totalFocusMinutes} min</span>
-                <span className="text-xs text-text-muted">{focusSessions.length} work intervals</span>
+                <span className="text-xs text-text-muted">Total focus duration</span>
               </div>
             </Card>
 
@@ -173,7 +173,7 @@ export function AnalyticsPage() {
               </div>
               <div>
                 <span className="text-xs font-bold text-text-muted uppercase tracking-wider block">Goal Milestones</span>
-                <span className="text-2xl font-bold text-text-strong block mt-0.5">{completedGoals} / {goals.length}</span>
+                <span className="text-2xl font-bold text-text-strong block mt-0.5">{completedGoals} / {totalGoals}</span>
                 <span className="text-xs text-text-muted">Goals achieved</span>
               </div>
             </Card>

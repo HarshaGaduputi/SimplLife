@@ -117,6 +117,3 @@ function getActionVariant(action: string): "primary" | "success" | "warning" | "
   if (act.includes("update") || act.includes("rename")) return "warning";
   return "info";
 }
-
-  return "info";
-}

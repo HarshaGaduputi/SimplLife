@@ -152,7 +152,7 @@ export interface ActivityLog {
   id: string;
   userId: string;
   action: string;
-  entityType: "group" | "task" | "subtask" | "template" | "user" | "goal" | "habit" | "note" | "journal";
+  entityType: "group" | "task" | "subtask" | "template" | "user" | "goal" | "habit" | "note" | "journal" | "event";
   entityName: string;
   detail: string | null;
   createdAt: string;

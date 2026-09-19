@@ -32,8 +32,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["Outfit", "ui-sans-serif", "system-ui", "sans-serif"],
-        sans: ['"Inter"', "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["-apple-system", "BlinkMacSystemFont", '"SF Pro Display"', "Inter", "system-ui", "sans-serif"],
+        sans: ["-apple-system", "BlinkMacSystemFont", '"SF Pro Text"', "Inter", "system-ui", "sans-serif"],
       },
       colors: {
         primary: {

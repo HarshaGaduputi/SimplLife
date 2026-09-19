@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Undo2, Redo2, Plus, ChevronDown, Trash2, FileText, ArrowRight, ArrowDownUp, Zap, Flag } from "lucide-react";
-import { groupsService, tasksService, stateService, trashService, HttpError } from "../../services/api";
+import { Undo2, Redo2, Plus, ChevronDown, Trash2, FileText, ArrowRight, ArrowDownUp, Zap, Flag, Brain } from "lucide-react";
+import { groupsService, tasksService, stateService, trashService, HttpError, aiApiService } from "../../services/api";
 import { useTasksStore } from "../../stores/tasksStore";
 import { useUIStore } from "../../stores/uiStore";
 import { useFiltersStore } from "../../stores/filtersStore";
@@ -11,6 +11,8 @@ import { TaskCard } from "../tasks/TaskCard";
 import { useAuthStore } from "../../stores/authStore";
 import { SmartSearchBar } from "../search/SmartSearchBar";
 import { KeyboardShortcutsModal } from "@/layouts/KeyboardShortcutsModal";
+import { DailyReviewDialog } from "../daily-review/DailyReviewDialog";
+import { Moon } from "lucide-react";
 
 const KEYWORD_MAP: Record<string, string> = {
   blog: "Blog Writing",
@@ -47,6 +49,9 @@ const KEYWORD_MAP: Record<string, string> = {
 };
 
 export function DashboardPage() {
+  const navigate = useNavigate();
+  const [reviewOpen, setReviewOpen] = useState(false);
+
   const groups = useTasksStore((s) => s.groups);
   const tasksByGroup = useTasksStore((s) => s.tasksByGroup);
   const setGroups = useTasksStore((s) => s.setGroups);
@@ -276,11 +281,19 @@ export function DashboardPage() {
           <h1 className="mt-3 text-3xl md:text-4xl text-balance">
             Welcome back, {user?.name?.split(" ")[0] ?? "friend"}.
           </h1>
-          <p className="mt-2 text-text-muted max-w-2xl">
-            Tasks grouped by people and categories. Track progress cleanly, with smart filters and instant restore.
+          <p className="mt-2 text-[var(--color-text-muted)] max-w-2xl text-lg">
+            Let's focus on what matters today.
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setReviewOpen(true)}
+            className="h-10 px-3 rounded-lg flex items-center gap-2 font-bold bg-surface border border-border-subtle text-text-strong hover:bg-surface-alt transition-colors"
+            title="Daily Review"
+          >
+            <Moon size={16} className="text-[var(--color-primary)]" />
+            <span className="hidden sm:inline">Review</span>
+          </button>
           <button
             onClick={handleUndo}
             disabled={!canUndo}
@@ -323,10 +336,10 @@ export function DashboardPage() {
                     <h3 className="font-semibold text-text-strong text-sm line-clamp-2">{task.title}</h3>
                   </div>
                   <button 
-                    onClick={() => document.querySelector<HTMLElement>(`[aria-label="Mark as done"]`)?.click()} // Placeholder quick action
-                    className="mt-4 text-xs font-bold text-primary hover:text-primary-hover flex items-center gap-1"
+                    onClick={() => navigate(`/focus?taskId=${task.id}`)}
+                    className="mt-4 text-xs font-bold text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] flex items-center gap-1"
                   >
-                    Start Task <ArrowRight size={12} />
+                    Start Focus <ArrowRight size={12} />
                   </button>
                 </div>
               ))}
@@ -399,6 +412,9 @@ export function DashboardPage() {
 
       {/* Keyboard Shortcuts Modal */}
       <KeyboardShortcutsModal />
+
+      {/* Daily Review Dialog */}
+      <DailyReviewDialog open={reviewOpen} onClose={() => setReviewOpen(false)} />
     </div>
   );
 }
