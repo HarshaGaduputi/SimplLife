@@ -25,6 +25,7 @@ import notesRoutes from "./routes/notes.routes.js";
 import journalRoutes from "./routes/journal.routes.js";
 import aiRoutes from "./routes/ai.routes.js";
 import calendarRoutes from "./routes/calendar.routes.js";
+import activityRoutes from "./routes/activity.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { config } from "./config/index.js";
 
@@ -103,6 +104,7 @@ app.use("/api/notes", notesRoutes);
 app.use("/api/journal", journalRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/calendar", calendarRoutes);
+app.use("/api/activity", activityRoutes);
 
 
 

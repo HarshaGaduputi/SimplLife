@@ -19,8 +19,7 @@ export function ActivityFeed() {
       const res = await activityService.list(50, 0);
       setLogs(res.logs);
     } catch {
-      // quiet fail or mock fallback
-      setLogs(MOCK_LOGS);
+      setLogs([]);
     } finally {
       setLoading(false);
     }
@@ -119,32 +118,5 @@ function getActionVariant(action: string): "primary" | "success" | "warning" | "
   return "info";
 }
 
-const MOCK_LOGS: ActivityLog[] = [
-  {
-    id: "log-1",
-    userId: "user-1",
-    action: "create",
-    entityType: "task",
-    entityName: "Prepare weekly status update",
-    detail: "Added to Marketing Workspace",
-    createdAt: new Date(Date.now() - 5 * 60000).toISOString(),
-  },
-  {
-    id: "log-2",
-    userId: "user-1",
-    action: "complete",
-    entityType: "task",
-    entityName: "Design dashboard layout",
-    detail: "Achieved ahead of target schedule",
-    createdAt: new Date(Date.now() - 30 * 60000).toISOString(),
-  },
-  {
-    id: "log-3",
-    userId: "user-1",
-    action: "create",
-    entityType: "group",
-    entityName: "SimplLife Collaboration Support",
-    detail: "Team collaboration group created successfully",
-    createdAt: new Date(Date.now() - 120 * 60000).toISOString(),
-  },
-];
+  return "info";
+}

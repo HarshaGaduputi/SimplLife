@@ -32,6 +32,8 @@ import { useAuthStore } from "@/stores/authStore";
 import { AIChat, AIChatButton } from "@/features/ai/AIChat";
 import { CommandPalette } from "@/features/ai/CommandPalette";
 
+import { NotificationBanner } from "@/features/notifications/NotificationBanner";
+
 function Shell({
   variant,
   children,
@@ -63,7 +65,10 @@ function Shell({
           <div className="lg:hidden">
             <Navbar variant="simple" />
           </div>
-          <main className="flex-1 min-w-0">{children}</main>
+          <main className="flex-1 min-w-0 p-4">
+            <NotificationBanner />
+            {children}
+          </main>
         </div>
         {isAuthenticated && (
           <>
