@@ -111,6 +111,13 @@ class MemoryDatabase {
     return userLogs.slice(offset, offset + limit);
   }
 
+  // ===== Calendar =====
+  async listCalendarEvents(userId: string): Promise<any[]> { return []; }
+  async getCalendarEvent(id: string): Promise<any | null> { return null; }
+  async createCalendarEvent(userId: string, params: any): Promise<any> { return null; }
+  async updateCalendarEvent(userId: string, id: string, patch: any): Promise<any | null> { return null; }
+  async deleteCalendarEvent(userId: string, id: string): Promise<boolean> { return false; }
+
   // ===== Users =====
   async createUser(params: {
     name: string;
@@ -158,6 +165,16 @@ class MemoryDatabase {
 
   async listAllUsers(): Promise<User[]> {
     return Array.from(this.state.users.values()).map((r) => r.user);
+  }
+
+  async deleteUser(userId: string): Promise<boolean> {
+    const record = this.state.users.get(userId);
+    if (!record) return false;
+    this.state.users.delete(userId);
+    this.state.usersByEmail.delete(record.user.email.toLowerCase());
+    // In-memory cascading is tedious, but we can do a simplified version if needed, 
+    // or rely on Postgres for production. For memory DB we just delete the user record.
+    return true;
   }
 
   // ===== Templates =====

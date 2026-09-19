@@ -51,4 +51,11 @@ export class AuthService {
     }
     return updated;
   }
+
+  static async deleteMe(userId: string): Promise<void> {
+    const deleted = await userRepository.delete(userId);
+    if (!deleted) {
+      throw new ApiError("User not found or deletion failed", 404);
+    }
+  }
 }

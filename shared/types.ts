@@ -116,6 +116,21 @@ export interface JournalEntry {
   updatedAt: string;
 }
 
+export interface CalendarEvent {
+  id: string;
+  userId: string;
+  title: string;
+  description: string | null;
+  date: string; // YYYY-MM-DD
+  startTime: string | null;
+  endTime: string | null;
+  type: "event" | "task_deadline" | "schedule";
+  reminderAt: string | null;
+  completed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TemplateSubtaskDef {
   title: string;
   order: number;

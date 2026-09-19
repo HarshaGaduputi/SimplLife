@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, X, Plus, Clock, Flag } from "lucide-react";
 import { groupsService, tasksService } from "../../services/api";
 import { useTasksStore } from "../../stores/tasksStore";
+import { useCalendarStore } from "../../stores/calendarStore";
 import type { Group, Task } from "../../../shared/types";
 
 export function CalendarView() {
@@ -16,19 +17,15 @@ export function CalendarView() {
   const [showDayModal, setShowDayModal] = useState(false);
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventTime, setNewEventTime] = useState("09:00");
-  const [newEventType, setNewEventType] = useState<"schedule" | "deadline">("schedule");
-  const [calendarEvents, setCalendarEvents] = useState<Record<string, Array<{id: string; title: string; time: string; type: "schedule" | "deadline"}>>>({});
+  const [newEventType, setNewEventType] = useState<"event" | "deadline">("event");
+  
+  const { events: dbEvents, fetchEvents, createEvent, deleteEvent } = useCalendarStore();
 
-  // Load events from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem("simpllife_calendar_events");
-    if (saved) setCalendarEvents(JSON.parse(saved));
-  }, []);
+    void fetchEvents();
+  }, [fetchEvents]);
 
-  // Save events to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem("simpllife_calendar_events", JSON.stringify(calendarEvents));
-  }, [calendarEvents]);
+
 
   useEffect(() => {
     async function load() {
@@ -85,6 +82,13 @@ export function CalendarView() {
     }
   }
 
+  const calendarEventsByDate: Record<string, any[]> = {};
+  for (const e of dbEvents) {
+    const key = e.date;
+    if (!calendarEventsByDate[key]) calendarEventsByDate[key] = [];
+    calendarEventsByDate[key].push(e);
+  }
+
   const groupNameMap: Record<string, string> = {};
   for (const g of groups) groupNameMap[g.id] = g.name;
 
@@ -94,25 +98,23 @@ export function CalendarView() {
     setSelectedDay(dateStr);
     setNewEventTitle("");
     setNewEventTime("09:00");
-    setNewEventType("schedule");
+    setNewEventType("event");
     setShowDayModal(true);
   }
 
-  function handleAddEvent() {
+  async function handleAddEvent() {
     if (!newEventTitle.trim() || !selectedDay) return;
-    const event = { id: Date.now().toString(), title: newEventTitle.trim(), time: newEventTime, type: newEventType };
-    setCalendarEvents(prev => ({
-      ...prev,
-      [selectedDay]: [...(prev[selectedDay] || []), event]
-    }));
+    await createEvent({
+      title: newEventTitle.trim(),
+      date: selectedDay,
+      startTime: newEventTime,
+      type: newEventType,
+    });
     setNewEventTitle("");
   }
 
-  function handleDeleteEvent(dateStr: string, eventId: string) {
-    setCalendarEvents(prev => ({
-      ...prev,
-      [dateStr]: (prev[dateStr] || []).filter(e => e.id !== eventId)
-    }));
+  async function handleDeleteEvent(dateStr: string, eventId: string) {
+    await deleteEvent(eventId);
   }
 
   return (
@@ -188,7 +190,7 @@ export function CalendarView() {
               ).padStart(2, "0")}`;
               const isToday = dateStr === todayStr;
               const dayTasks = tasksByDate[dateStr] || [];
-              const dayEvents = calendarEvents[dateStr] || [];
+              const dayEvents = calendarEventsByDate[dateStr] || [];
 
               return (
                 <div
@@ -251,7 +253,7 @@ export function CalendarView() {
                       <div
                         key={ev.id}
                         className="rounded-lg p-1 text-xs border border-border-subtle truncate flex items-center gap-1 bg-surface-alt"
-                        title={`${ev.time} - ${ev.title}`}
+                        title={`${ev.startTime || ''} - ${ev.title}`}
                       >
                         <span
                           className={`h-2 w-2 rounded-full shrink-0 ${
@@ -309,12 +311,12 @@ export function CalendarView() {
             )}
 
             {/* Calendar events for this day */}
-            {(calendarEvents[selectedDay] || []).length > 0 && (
+            {(calendarEventsByDate[selectedDay] || []).length > 0 && (
               <div className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">Scheduled</p>
-                {(calendarEvents[selectedDay] || []).map(ev => (
+                {(calendarEventsByDate[selectedDay] || []).map(ev => (
                   <div key={ev.id} className="flex items-center gap-2 p-2 rounded-lg bg-[var(--color-surface-alt)] text-sm">
-                    <span className="text-[var(--color-text-muted)] w-12 shrink-0 text-xs">{ev.time}</span>
+                    <span className="text-[var(--color-text-muted)] w-12 shrink-0 text-xs">{ev.startTime}</span>
                     <span className={`flex-1 text-[var(--color-text-strong)] ${ev.type === "deadline" ? "text-[var(--color-danger)]" : ""}`}>{ev.title}</span>
                     {ev.type === "deadline" ? <Flag size={12} className="text-[var(--color-danger)]" /> : <Clock size={12} className="text-[var(--color-primary)]" />}
                     <button onClick={() => handleDeleteEvent(selectedDay, ev.id)} className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"><X size={14} /></button>
@@ -343,10 +345,10 @@ export function CalendarView() {
                 />
                 <select
                   value={newEventType}
-                  onChange={e => setNewEventType(e.target.value as "schedule" | "deadline")}
+                  onChange={e => setNewEventType(e.target.value as "event" | "deadline")}
                   className="flex-1 px-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-alt)] text-[var(--color-text-strong)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 >
-                  <option value="schedule">Schedule</option>
+                  <option value="event">Event</option>
                   <option value="deadline">Deadline</option>
                 </select>
               </div>

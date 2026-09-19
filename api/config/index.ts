@@ -11,6 +11,10 @@ if (isProduction && (jwtSecret === "tasknest-dev-secret-change-me" || jwtSecret 
 
 const hasDatabase = !!process.env.DATABASE_URL;
 if (!hasDatabase) {
+  if (isProduction) {
+    console.error("FATAL: DATABASE_URL is required in production.");
+    process.exit(1);
+  }
   console.warn("⚠️ WARNING: Running in DEMO MODE. Database is not connected (no DATABASE_URL). Data will reset on server restart.");
 }
 
@@ -23,7 +27,7 @@ export const config = {
     expiresIn: "7d" as const,
   },
   cors: {
-    origin: process.env.CORS_ORIGIN || "*",
+    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
   },
   rateLimit: {
     general: {
@@ -35,8 +39,12 @@ export const config = {
       max: 20,
     },
   },
-  openai: {
-    apiKey: process.env.OPENAI_API_KEY || "",
+  ai: {
+    apiKey: process.env.AI_API_KEY || process.env.OPENAI_API_KEY || "",
+    baseUrl: process.env.AI_BASE_URL || "https://api.openai.com/v1",
+    model: process.env.AI_MODEL || "gpt-4o-mini",
+    temperature: Number(process.env.AI_TEMPERATURE || 0.7),
+    maxTokens: Number(process.env.AI_MAX_TOKENS || 1000),
   },
   trash: {
     autoEmptyDays: 30,

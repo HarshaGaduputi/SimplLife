@@ -36,4 +36,9 @@ export const userRepository = {
     const db = getDb();
     return db.listAllUsers();
   },
+
+  async delete(userId: string): Promise<boolean> {
+    const db = getDb();
+    return db.deleteUser(userId);
+  }
 };

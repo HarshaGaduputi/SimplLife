@@ -5,6 +5,7 @@ import type { Note } from "../../../shared/types";
 import { Button, Input, Card, Badge, Loader } from "@/components/ui";
 import { useToastStore } from "@/stores/toastStore";
 import ReactMarkdown from 'react-markdown';
+import { parseNoteToTodo, ParsedTodo } from "./utils/parseNoteToTodo";
 
 
 export function NotesPage() {
@@ -22,6 +23,12 @@ export function NotesPage() {
   const [saving, setSaving] = useState(false);
   const [aiSummary, setAiSummary] = useState<{ summary: string; topics: string[]; tags: string[] } | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  
+  // Note-to-Todo Conversion State
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [parsedTodos, setParsedTodos] = useState<ParsedTodo[]>([]);
+  const [isConverting, setIsConverting] = useState(false);
+
   const toast = useToastStore((s) => s.toast);
 
   // Autosave
@@ -214,29 +221,54 @@ export function NotesPage() {
     }
   }
 
-  async function handleConvertToTodo() {
+  function handleConvertToTodoPreview() {
     if (!content.trim()) return;
-    
-    const lines = content.split("\n")
-      .map(line => line.replace(/^[-*•]\s+/, "").replace(/^\d+\.\s+/, "").replace(/^#+\s+/, "").trim())
-      .filter(line => line.length > 0);
+    const parsed = parseNoteToTodo(content);
+    if (parsed.length === 0) {
+      toast({ kind: "error", message: "No lists found to convert." });
+      return;
+    }
+    setParsedTodos(parsed);
+    setShowConvertModal(true);
+  }
 
-    if (lines.length === 0) return;
-
+  async function handleConfirmConvert() {
+    if (parsedTodos.length === 0) return;
+    setIsConverting(true);
     const groupName = title.trim() || "Note To-Do";
-    
+
     try {
       const gRes = await groupsService.create(groupName);
       const groupId = gRes.group.id;
       
-      for (const line of lines) {
-        await tasksService.create(groupId, { title: line });
+      // We only support 1 level of subtasks natively, but let's try to map the tree
+      for (const todo of parsedTodos) {
+        const taskRes = await tasksService.create(groupId, { title: todo.title });
+        const taskId = taskRes.task.id;
+        
+        // Recursive function to add subtasks, flattening deeper levels if needed
+        const addSubtasks = async (subtasks: ParsedTodo[], prefix = "") => {
+          for (const sub of subtasks) {
+            const fullTitle = prefix ? `${prefix} ${sub.title}` : sub.title;
+            await tasksService.createSubtask(taskId, { title: fullTitle });
+            if (sub.subtasks.length > 0) {
+              await addSubtasks(sub.subtasks, fullTitle + " -");
+            }
+          }
+        };
+        
+        if (todo.subtasks.length > 0) {
+          await addSubtasks(todo.subtasks);
+        }
       }
       
       setIsTodoList(true);
-      toast({ kind: "success", message: `Created "${groupName}" task list with ${lines.length} items! Find it in your dashboard.` });
+      setShowConvertModal(false);
+      toast({ kind: "success", message: `Created "${groupName}" task list! Find it in your dashboard.` });
     } catch {
       toast({ kind: "error", message: "Failed to convert to to-do list" });
+    } finally {
+      setIsConverting(false);
     }
   }
 
@@ -373,7 +405,7 @@ export function NotesPage() {
                   <Button
                     type="button"
                     variant="secondary"
-                    onClick={handleConvertToTodo}
+                    onClick={handleConvertToTodoPreview}
                     disabled={!content.trim() || isTodoList}
                     leftIcon={<CheckSquare size={16} />}
                     title="Convert this note into a task group in your dashboard"
@@ -462,6 +494,57 @@ export function NotesPage() {
           </Card>
         </div>
       </div>
+
+      {/* Convert to Todo Confirmation Modal */}
+      {showConvertModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-[var(--color-surface)] rounded-2xl border border-[var(--color-border)] shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between shrink-0">
+              <h2 className="text-lg font-bold text-[var(--color-text-strong)]">
+                Convert to To-Do List
+              </h2>
+              <button onClick={() => setShowConvertModal(false)} className="text-[var(--color-text-muted)] hover:text-[var(--color-text)]">
+                <XIcon size={20} />
+              </button>
+            </div>
+            
+            <p className="text-sm text-[var(--color-text-muted)] shrink-0">
+              The following tasks will be created in a new group called <span className="font-bold text-[var(--color-text-strong)]">"{title.trim() || "Note To-Do"}"</span>:
+            </p>
+
+            <div className="flex-1 overflow-y-auto space-y-2 border border-[var(--color-border-subtle)] rounded-lg p-4 bg-[var(--color-surface-alt)]">
+              {parsedTodos.map((todo, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-strong)]">
+                    <CheckSquare size={14} className="text-[var(--color-primary)]" />
+                    <span>{todo.title}</span>
+                  </div>
+                  {todo.subtasks.map((sub, sidx) => (
+                    <div key={sidx} className="pl-6 flex items-center gap-2 text-xs text-[var(--color-text)]">
+                      <div className="h-1 w-1 rounded-full bg-[var(--color-text-muted)]" />
+                      <span>{sub.title}</span>
+                      {sub.subtasks.length > 0 && (
+                        <span className="text-[10px] text-[var(--color-text-muted)]">
+                          (+{sub.subtasks.length} nested)
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2 shrink-0 border-t border-[var(--color-border-subtle)]">
+              <Button variant="secondary" onClick={() => setShowConvertModal(false)} disabled={isConverting}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleConfirmConvert} disabled={isConverting}>
+                {isConverting ? "Creating..." : "Confirm & Create"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

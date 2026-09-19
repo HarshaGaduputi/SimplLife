@@ -45,4 +45,14 @@ export const authController = {
       next(err);
     }
   },
+
+  async deleteMe(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      await AuthService.deleteMe(req.userId!);
+      res.clearCookie("token");
+      res.status(200).json({ success: true, message: "Account deleted successfully" });
+    } catch (err) {
+      next(err);
+    }
+  },
 };
