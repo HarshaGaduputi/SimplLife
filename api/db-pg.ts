@@ -88,6 +88,7 @@ export class PostgresDatabase {
       priority: row.priority,
       dueDate: row.due_date?.toISOString() || null,
       goalId: row.goal_id || null,
+      dependsOnId: row.depends_on_id || null,
       startDate: row.start_date?.toISOString() || null,
       estimatedDuration: row.estimated_duration,
       actualDuration: row.actual_duration,
@@ -384,6 +385,7 @@ export class PostgresDatabase {
     pinned?: boolean;
     favorite?: boolean;
     goalId?: string | null;
+    dependsOnId?: string | null;
   }): Promise<Task> {
     const group = await this.getGroup(params.groupId);
     if (!group) throw new Error("Group not found");
@@ -399,15 +401,15 @@ export class PostgresDatabase {
       INSERT INTO tasks (
         id, group_id, user_id, title, description, position, template_id, priority,
         due_date, start_date, estimated_duration, actual_duration, tags, recurring,
-        pinned, favorite, goal_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        pinned, favorite, goal_id, depends_on_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       RETURNING *
     `, [
       id, params.groupId, group.userId, params.title, params.description || null,
       order, params.templateId || null, params.priority || 'none',
       params.dueDate || null, params.startDate || null, params.estimatedDuration || null,
       params.actualDuration || null, params.tags || '{}', params.recurring || null,
-      params.pinned || false, params.favorite || false, params.goalId || null
+      params.pinned || false, params.favorite || false, params.goalId || null, params.dependsOnId || null
     ]);
 
     await this.logActivity({
@@ -440,6 +442,7 @@ export class PostgresDatabase {
     if (patch.priority !== undefined) { updates.push(`priority = $${i++}`); params.push(patch.priority); }
     if (patch.dueDate !== undefined) { updates.push(`due_date = $${i++}`); params.push(patch.dueDate); }
     if (patch.goalId !== undefined) { updates.push(`goal_id = $${i++}`); params.push(patch.goalId); }
+    if (patch.dependsOnId !== undefined) { updates.push(`depends_on_id = $${i++}`); params.push(patch.dependsOnId); }
     if (patch.startDate !== undefined) { updates.push(`start_date = $${i++}`); params.push(patch.startDate); }
     if (patch.estimatedDuration !== undefined) { updates.push(`estimated_duration = $${i++}`); params.push(patch.estimatedDuration); }
     if (patch.actualDuration !== undefined) { updates.push(`actual_duration = $${i++}`); params.push(patch.actualDuration); }

@@ -1,0 +1,1 @@
+ALTER TABLE tasks ADD COLUMN depends_on_id TEXT REFERENCES tasks(id) ON DELETE SET NULL;

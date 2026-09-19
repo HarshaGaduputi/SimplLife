@@ -480,6 +480,7 @@ function GroupPanel({
   type SortOption = "default" | "priority" | "dueDate";
   const [sortBy, setSortBy] = useState<SortOption>("default");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [isPrioritizing, setIsPrioritizing] = useState(false);
 
   const delay = (index % 6) * 40;
 
@@ -587,6 +588,40 @@ function GroupPanel({
     });
   }, [activeTasks, sortBy]);
 
+  async function handleAIPrioritize() {
+    if (activeTasks.length < 2) {
+      toast({ kind: "info", message: "Need at least 2 tasks to prioritize." });
+      return;
+    }
+    setIsPrioritizing(true);
+    try {
+      const res = await aiApiService.prioritizeTasks(activeTasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        dueDate: t.dueDate
+      })));
+      
+      pushHistory("ai-prioritize", { groupId: group.id });
+      // Apply priorities locally and to server
+      const newTasks = [...activeTasks];
+      for (const p of res.priorities) {
+        const task = newTasks.find(t => t.id === p.id);
+        if (task && task.priority !== p.priority) {
+          task.priority = p.priority as any;
+          await tasksService.update(p.id, { priority: p.priority as any });
+        }
+      }
+      const fresh = await tasksService.list(group.id);
+      setTasks(group.id, fresh.tasks);
+      setSortBy("priority");
+      toast({ kind: "success", message: "Tasks prioritized by AI" });
+    } catch (e) {
+      toast({ kind: "error", message: (e as Error).message });
+    } finally {
+      setIsPrioritizing(false);
+    }
+  }
+
   return (
     <section
       className="card card-hover flex flex-col fade-in-up min-h-[280px]"
@@ -638,6 +673,15 @@ function GroupPanel({
               </button>
               {sortMenuOpen && (
                 <div className="absolute right-0 top-full mt-1 w-36 rounded-xl border z-40 p-1 bg-surface border-border-subtle shadow-lg">
+                  <button
+                    onClick={() => { handleAIPrioritize(); setSortMenuOpen(false); }}
+                    disabled={isPrioritizing}
+                    className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-xs rounded-lg hover:bg-surface-alt text-primary font-medium"
+                  >
+                    <Brain size={12} />
+                    {isPrioritizing ? "Prioritizing..." : "AI Prioritize"}
+                  </button>
+                  <div className="h-px w-full bg-border-subtle my-1" />
                   <button
                     onClick={() => { setSortBy("default"); setSortMenuOpen(false); }}
                     className={`w-full text-left px-3 py-1.5 text-xs rounded-lg hover:bg-surface-alt ${sortBy === "default" ? "font-bold text-primary" : ""}`}

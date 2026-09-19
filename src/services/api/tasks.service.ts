@@ -19,6 +19,7 @@ export type TaskCreatePayload = {
   priority?: PriorityLevel | null;
   dueDate?: string | null;
   goalId?: string | null;
+  dependsOnId?: string | null;
 };
 
 export type TaskUpdatePayload = {
@@ -30,6 +31,7 @@ export type TaskUpdatePayload = {
   priority?: PriorityLevel | null;
   dueDate?: string | null;
   goalId?: string | null;
+  dependsOnId?: string | null;
 };
 
 export const tasksService = {

@@ -16,6 +16,7 @@ export const CreateTaskInGroupSchema = z.object({
   priority: z.enum(["high", "medium", "low", "none"]).nullable().optional(),
   dueDate: z.string().nullable().optional(),
   goalId: z.string().nullable().optional(),
+  dependsOnId: z.string().nullable().optional(),
 });
 
 export const GroupIdParamSchema = z.object({
