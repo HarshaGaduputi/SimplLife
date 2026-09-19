@@ -255,7 +255,11 @@ export function DashboardPage() {
     }
     
     // 1. Get tasks due today
-    let focus = allActive.filter(t => t.task.dueDate === todayStr);
+     let focus = allActive.filter(t => {
+      if (!t.task.dueDate) return false;
+      const datePart = t.task.dueDate.split("T")[0];
+      return datePart === todayStr;
+    });
     
     // 2. If fewer than 3, backfill with high priority
     if (focus.length < 3) {
@@ -272,8 +276,12 @@ export function DashboardPage() {
     return focus.slice(0, 3);
   }, [groups, tasksByGroup, todayStr]);
 
+  if (!loaded) {
+    return <DashboardSkeleton />;
+  }
+
   return (
-    <div className="p-4 md:p-6 lg:p-8">
+    <div className="p-4 md:p-6 lg:p-8 animate-page-enter">
 
       <header className="flex flex-wrap items-start justify-between gap-4 mb-8">
         <div>
@@ -419,6 +427,39 @@ export function DashboardPage() {
   );
 }
 
+function DashboardSkeleton() {
+  return (
+    <div className="p-4 md:p-6 lg:p-8 animate-page-enter">
+      <header className="mb-8">
+        <div className="h-6 w-24 rounded-full animate-shimmer mb-3" />
+        <div className="h-10 w-72 rounded-lg animate-shimmer mb-2" />
+        <div className="h-5 w-56 rounded-lg animate-shimmer" />
+      </header>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="card min-h-[280px] flex flex-col gap-4"
+            style={{ animationDelay: `${i * 80}ms` }}
+          >
+            <div className="h-7 w-32 rounded-lg animate-shimmer" />
+            <div className="h-4 w-20 rounded animate-shimmer" />
+            <div className="space-y-3 flex-1">
+              {[0, 1, 2].map((j) => (
+                <div key={j} className="flex items-center gap-3">
+                  <div className="h-5 w-5 rounded shrink-0 animate-shimmer" />
+                  <div className="h-4 flex-1 rounded animate-shimmer" />
+                </div>
+              ))}
+            </div>
+            <div className="h-11 w-full rounded-lg animate-shimmer" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div
@@ -476,6 +517,26 @@ function GroupPanel({
   const [sortBy, setSortBy] = useState<SortOption>("default");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [isPrioritizing, setIsPrioritizing] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close sort menu on click outside or Escape
+  useEffect(() => {
+    if (!sortMenuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) {
+        setSortMenuOpen(false);
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setSortMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [sortMenuOpen]);
 
   const delay = (index % 6) * 40;
 
@@ -658,7 +719,7 @@ function GroupPanel({
           </div>
         </div>
           <div className="flex items-center gap-1">
-            <div className="relative">
+            <div className="relative" ref={sortMenuRef}>
               <button
                 aria-label="Sort tasks"
                 onClick={() => setSortMenuOpen(!sortMenuOpen)}

@@ -53,6 +53,26 @@ export function TaskCard({
 
   const titleRef = useRef<HTMLInputElement>(null);
   const cardRef = useRef<HTMLElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close action menu on click outside or Escape
+  useEffect(() => {
+    if (!showMenu) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setShowMenu(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [showMenu]);
 
   useEffect(() => {
     setTitleDraft(task.title);
@@ -638,7 +658,7 @@ export function TaskCard({
             )}
           </button>
 
-          <div className="relative">
+          <div className="relative" ref={menuRef}>
             <button
               aria-label="Task actions"
               className="h-8 w-8 rounded-lg flex items-center justify-center text-text-muted hover:text-text-strong hover:bg-surface-alt"

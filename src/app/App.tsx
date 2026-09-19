@@ -5,6 +5,7 @@ import {
   Route,
   Navigate,
   useLocation,
+  Link,
 } from "react-router-dom";
 import { Navbar } from "@/layouts/Navbar";
 import { Footer } from "@/layouts/Footer";
@@ -107,16 +108,51 @@ function AuthHydrationGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [pathname]);
+  return null;
+}
+
+function PageTransition({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  return (
+    <div key={location.pathname} className="animate-page-enter">
+      {children}
+    </div>
+  );
+}
+
+function NotFoundPage() {
+  return (
+    <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-6">
+      <div className="text-8xl font-bold text-primary opacity-20 mb-4">404</div>
+      <h1 className="text-3xl font-bold text-text-strong mb-3">Page not found</h1>
+      <p className="text-text-muted mb-8 max-w-md">
+        The page you&apos;re looking for doesn&apos;t exist or has been moved.
+      </p>
+      <Link to="/dashboard" className="btn-primary h-12 px-6">
+        Go to Dashboard
+      </Link>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthHydrationGate>
+        <ScrollToTop />
         <Routes>
           <Route
             path="/"
             element={
               <Shell variant="marketing">
-                <HomePage />
+                <PageTransition>
+                  <HomePage />
+                </PageTransition>
               </Shell>
             }
           />
@@ -270,7 +306,14 @@ export default function App() {
             }
           />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route
+            path="*"
+            element={
+              <Shell variant="marketing">
+                <NotFoundPage />
+              </Shell>
+            }
+          />
         </Routes>
         <ToastStack />
       </AuthHydrationGate>
