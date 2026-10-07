@@ -1,8 +1,9 @@
 import app from './app.js';
 import { initCronJobs } from './cron.js';
 import { runMigrations } from './db/migrate.js';
+import { config } from './config/index.js';
 
-const PORT = process.env.PORT || 3002;
+const PORT = config.port;
 
 runMigrations().then(() => {
   const server = app.listen(PORT, () => {

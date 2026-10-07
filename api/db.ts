@@ -13,6 +13,7 @@ import type {
   FocusSession,
   Note,
   JournalEntry,
+  CalendarEvent,
 } from "../shared/types.js";
 import { SEED_TEMPLATES } from "./services/seedTemplates.service.js";
 import { config } from "./config/index.js";
@@ -55,6 +56,18 @@ interface DBState {
   focusSessions: FocusSession[];
   notes: Map<string, Note>;
   journalEntries: Map<string, JournalEntry>;
+  calendarEvents: Map<string, CalendarEvent>;
+}
+
+interface AnalyticsData {
+  completedTasks: number;
+  completionRate: number;
+  totalFocusMinutes: number;
+  completedGoals: number;
+  totalGoals: number;
+  activeHabitsCount: number;
+  bestStreak: number;
+  completedTasksCountByDate: Record<string, number>;
 }
 
 class MemoryDatabase {
@@ -75,6 +88,7 @@ class MemoryDatabase {
       focusSessions: [],
       notes: new Map(),
       journalEntries: new Map(),
+      calendarEvents: new Map(),
     };
     for (const t of SEED_TEMPLATES) {
       this.state.templates.set(t.id, { ...t });
@@ -112,11 +126,55 @@ class MemoryDatabase {
   }
 
   // ===== Calendar =====
-  async listCalendarEvents(userId: string): Promise<any[]> { return []; }
-  async getCalendarEvent(id: string): Promise<any | null> { return null; }
-  async createCalendarEvent(userId: string, params: any): Promise<any> { return null; }
-  async updateCalendarEvent(userId: string, id: string, patch: any): Promise<any | null> { return null; }
-  async deleteCalendarEvent(userId: string, id: string): Promise<boolean> { return false; }
+  async listCalendarEvents(userId: string): Promise<CalendarEvent[]> {
+    return Array.from(this.state.calendarEvents.values())
+      .filter((event) => event.userId === userId)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
+  }
+
+  async getCalendarEvent(id: string): Promise<CalendarEvent | null> {
+    return this.state.calendarEvents.get(id) ?? null;
+  }
+
+  async createCalendarEvent(
+    userId: string,
+    params: Partial<CalendarEvent> & { title: string; date: string },
+  ): Promise<CalendarEvent> {
+    const timestamp = now();
+    const event: CalendarEvent = {
+      id: uid("cal"),
+      userId,
+      title: params.title,
+      description: params.description ?? null,
+      date: params.date,
+      startTime: params.startTime ?? null,
+      endTime: params.endTime ?? null,
+      type: params.type ?? "event",
+      reminderAt: params.reminderAt ?? null,
+      completed: params.completed ?? false,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    this.state.calendarEvents.set(event.id, event);
+    return event;
+  }
+
+  async updateCalendarEvent(
+    userId: string,
+    id: string,
+    patch: Partial<CalendarEvent>,
+  ): Promise<CalendarEvent | null> {
+    const current = this.state.calendarEvents.get(id);
+    if (!current || current.userId !== userId) return null;
+    const updated = { ...current, ...patch, id: current.id, userId: current.userId, updatedAt: now() };
+    this.state.calendarEvents.set(id, updated);
+    return updated;
+  }
+
+  async deleteCalendarEvent(userId: string, id: string): Promise<boolean> {
+    const current = this.state.calendarEvents.get(id);
+    return !!current && current.userId === userId && this.state.calendarEvents.delete(id);
+  }
 
   // ===== Users =====
   async createUser(params: {
@@ -170,10 +228,29 @@ class MemoryDatabase {
   async deleteUser(userId: string): Promise<boolean> {
     const record = this.state.users.get(userId);
     if (!record) return false;
+    const groupIds = new Set(
+      Array.from(this.state.groups.values())
+        .filter((group) => group.userId === userId)
+        .map((group) => group.id),
+    );
+    for (const [id, task] of this.state.tasks) {
+      if (groupIds.has(task.groupId)) this.state.tasks.delete(id);
+    }
+    for (const [id, subtask] of this.state.subtasks) {
+      if (!this.state.tasks.has(subtask.taskId)) this.state.subtasks.delete(id);
+    }
+    for (const [id, group] of this.state.groups) {
+      if (group.userId === userId) this.state.groups.delete(id);
+    }
+    for (const [id, goal] of this.state.goals) if (goal.userId === userId) this.state.goals.delete(id);
+    for (const [id, habit] of this.state.habits) if (habit.userId === userId) this.state.habits.delete(id);
+    this.state.focusSessions = this.state.focusSessions.filter((session) => session.userId !== userId);
+    for (const [id, note] of this.state.notes) if (note.userId === userId) this.state.notes.delete(id);
+    for (const [id, entry] of this.state.journalEntries) if (entry.userId === userId) this.state.journalEntries.delete(id);
+    for (const [id, event] of this.state.calendarEvents) if (event.userId === userId) this.state.calendarEvents.delete(id);
+    this.state.activityLogs = this.state.activityLogs.filter((log) => log.userId !== userId);
     this.state.users.delete(userId);
     this.state.usersByEmail.delete(record.user.email.toLowerCase());
-    // In-memory cascading is tedious, but we can do a simplified version if needed, 
-    // or rely on Postgres for production. For memory DB we just delete the user record.
     return true;
   }
 
@@ -730,12 +807,6 @@ class MemoryDatabase {
     const groupIds = new Set(userGroups.map((g) => g.id));
     let count = 0;
 
-    for (const g of userGroups) {
-      if (g.deletedAt) {
-        this.state.groups.delete(g.id);
-        count++;
-      }
-    }
     for (const t of Array.from(this.state.tasks.values())) {
       if (groupIds.has(t.groupId) && t.deletedAt) {
         this.state.tasks.delete(t.id);
@@ -746,6 +817,12 @@ class MemoryDatabase {
       const task = this.state.tasks.get(s.taskId);
       if (task && groupIds.has(task.groupId) && s.deletedAt) {
         this.state.subtasks.delete(s.id);
+        count++;
+      }
+    }
+    for (const g of userGroups) {
+      if (g.deletedAt) {
+        this.state.groups.delete(g.id);
         count++;
       }
     }
@@ -1127,12 +1204,18 @@ class MemoryDatabase {
   async createFocusSession(
     userId: string,
     duration: number,
+    taskId?: string | null,
     taskTitle?: string | null,
   ): Promise<FocusSession> {
+    if (taskId) {
+      const ownedTask = (await this.listAllTasksForUser(userId)).some((task) => task.id === taskId);
+      if (!ownedTask) taskId = null;
+    }
     const session: FocusSession = {
       id: uid("foc"),
       userId,
       duration,
+      taskId: taskId ?? null,
       taskTitle: taskTitle ?? null,
       createdAt: now(),
     };
@@ -1257,16 +1340,26 @@ class MemoryDatabase {
     return entry;
   }
 
-  async getAnalytics(userId: string): Promise<any> {
+  async getAnalytics(userId: string): Promise<AnalyticsData> {
+    const tasks = await this.listAllTasksForUser(userId);
+    const completedTasks = tasks.filter((task) => task.completed);
+    const goals = await this.listGoals(userId);
+    const habits = await this.listHabits(userId);
+    const sessions = await this.listFocusSessions(userId);
+    const completedTasksCountByDate: Record<string, number> = {};
+    for (const task of completedTasks) {
+      const date = (task.completedAt ?? task.updatedAt).slice(0, 10);
+      completedTasksCountByDate[date] = (completedTasksCountByDate[date] ?? 0) + 1;
+    }
     return {
-      completedTasks: 0,
-      completionRate: 0,
-      totalFocusMinutes: 0,
-      completedGoals: 0,
-      totalGoals: 0,
-      activeHabitsCount: 0,
-      bestStreak: 0,
-      completedTasksCountByDate: {}
+      completedTasks: completedTasks.length,
+      completionRate: tasks.length ? Math.round((completedTasks.length / tasks.length) * 100) : 0,
+      totalFocusMinutes: sessions.reduce((sum, session) => sum + session.duration, 0),
+      completedGoals: goals.filter((goal) => goal.completed).length,
+      totalGoals: goals.length,
+      activeHabitsCount: habits.length,
+      bestStreak: habits.reduce((best, habit) => Math.max(best, habit.streak), 0),
+      completedTasksCountByDate,
     };
   }
 

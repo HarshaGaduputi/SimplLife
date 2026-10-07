@@ -1,13 +1,11 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import request from 'supertest';
 import app from '../app.js';
-import { getDb } from '../db.js';
 
 describe('Authorization Checks', () => {
   let userAToken: string;
   let userBToken: string;
   let userANoteId: string;
-  let userBNoteId: string;
 
   beforeAll(async () => {
     // Register User A

@@ -18,8 +18,8 @@ router.get("/", requireAuth, async (req: AuthRequest, res, next) => {
 
 router.post("/", requireAuth, validate(CreateFocusSessionSchema), async (req: AuthRequest, res, next) => {
   try {
-    const { duration, taskTitle } = req.body;
-    const session = await db.createFocusSession(req.userId!, duration, taskTitle);
+    const { duration, taskId, taskTitle } = req.body;
+    const session = await db.createFocusSession(req.userId!, duration, taskId, taskTitle);
     res.status(201).json({ success: true, session });
   } catch (e) {
     next(e);

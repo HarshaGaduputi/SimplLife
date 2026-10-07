@@ -126,7 +126,7 @@ export function HomePage() {
             { step: '01', title: 'Capture everything', desc: 'Quick-add tasks, notes, and habits before you forget them. Hit Cmd+K from anywhere.', align: 'left' },
             { step: '02', title: 'Organise effortlessly', desc: 'Drag and drop into groups. Add tags, due dates, and priorities with natural language.', align: 'right' },
             { step: '03', title: 'Execute with focus', desc: 'Use the built-in Pomodoro timer to enter deep work. Track your daily streaks.', align: 'left' }
-          ].map((item, i) => (
+          ].map((item, _i) => (
             <ScrollReveal key={item.step} delay={100}>
               <div className={`flex flex-col md:flex-row items-center gap-12 ${item.align === 'right' ? 'md:flex-row-reverse' : ''}`}>
                 <div className="flex-1 space-y-6">

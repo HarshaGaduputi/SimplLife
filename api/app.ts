@@ -17,7 +17,6 @@ import templatesRoutes from "./routes/templates.routes.js";
 import contactRoutes from "./routes/contact.routes.js";
 import trashRoutes from "./routes/trash.routes.js";
 import exportImportRoutes from "./routes/exportImport.routes.js";
-import stateSyncRoutes from "./routes/stateSync.routes.js";
 import goalsRoutes from "./routes/goals.routes.js";
 import habitsRoutes from "./routes/habits.routes.js";
 import focusRoutes from "./routes/focus.routes.js";
@@ -44,7 +43,7 @@ const corsOrigins = config.cors.origin.includes(",")
 app.use(
   cors({
     origin: corsOrigins,
-    credentials: false,
+    credentials: true,
   }),
 );
 
@@ -65,7 +64,7 @@ app.use(
         ],
         "font-src": ["'self'", "https://fonts.gstatic.com"],
         "img-src": ["'self'", "data:"],
-        "connect-src": ["'self'"],
+        "connect-src": ["'self'", ...((Array.isArray(corsOrigins) ? corsOrigins : [corsOrigins]).filter(Boolean))],
       },
     },
   }),
@@ -97,7 +96,6 @@ app.use("/api/templates", templatesRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/trash", trashRoutes);
 app.use("/api", exportImportRoutes);
-app.use("/api/state", stateSyncRoutes);
 app.use("/api/goals", goalsRoutes);
 app.use("/api/habits", habitsRoutes);
 app.use("/api/focus", focusRoutes);

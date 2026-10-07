@@ -31,7 +31,6 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
   const groups = useTasksStore(s => s.groups);
   const tasksByGroup = useTasksStore(s => s.tasksByGroup);
-  const addTask = useTasksStore(s => s.addTask);
 
   const commands: Command[] = [
     {
@@ -45,58 +44,50 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       id: "nav-goals",
       label: "Go to Goals",
       icon: <Target size={16} />,
-      action: () => { navigate("/goals"); onClose(); },
+      action: () => { navigate("/dashboard/goals"); onClose(); },
       keywords: ["milestones", "objectives"],
     },
     {
       id: "nav-habits",
       label: "Go to Habits",
       icon: <Zap size={16} />,
-      action: () => { navigate("/habits"); onClose(); },
+      action: () => { navigate("/dashboard/habits"); onClose(); },
       keywords: ["routine", "streak", "daily"],
     },
     {
       id: "nav-focus",
       label: "Go to Focus Mode",
       icon: <Sparkles size={16} />,
-      action: () => { navigate("/focus"); onClose(); },
+      action: () => { navigate("/dashboard/focus"); onClose(); },
       keywords: ["pomodoro", "timer", "concentrate"],
     },
     {
       id: "nav-notes",
       label: "Go to Notes",
       icon: <FileText size={16} />,
-      action: () => { navigate("/notes"); onClose(); },
+      action: () => { navigate("/dashboard/notes"); onClose(); },
       keywords: ["write", "documents", "ideas"],
     },
     {
       id: "nav-journal",
       label: "Go to Journal",
       icon: <BookOpen size={16} />,
-      action: () => { navigate("/journal"); onClose(); },
+      action: () => { navigate("/dashboard/journal"); onClose(); },
       keywords: ["mood", "reflection", "diary"],
     },
     {
       id: "nav-calendar",
       label: "Go to Calendar",
       icon: <Calendar size={16} />,
-      action: () => { navigate("/calendar"); onClose(); },
+      action: () => { navigate("/dashboard/calendar"); onClose(); },
       keywords: ["schedule", "events", "dates"],
     },
     {
       id: "nav-analytics",
       label: "Go to Analytics",
       icon: <BarChart2 size={16} />,
-      action: () => { navigate("/analytics"); onClose(); },
+      action: () => { navigate("/dashboard/analytics"); onClose(); },
       keywords: ["stats", "reports", "insights"],
-    },
-    {
-      id: "nav-ai-planner",
-      label: "Open AI Planner",
-      description: "Generate your optimized daily plan",
-      icon: <Sparkles size={16} className="text-primary" />,
-      action: () => { navigate("/ai/planner"); onClose(); },
-      keywords: ["plan", "schedule", "ai", "generate"],
     },
     {
       id: "nav-settings",
@@ -163,7 +154,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         id: t.id,
         type: "Task",
         title: t.title,
-        action: () => { navigate("/"); onClose(); }
+        action: () => { navigate("/dashboard"); onClose(); }
       })));
       setSearchableData(allTasks);
 
@@ -176,13 +167,13 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
           id: n.id,
           type: "Note",
           title: n.title,
-          action: () => { navigate("/notes"); onClose(); }
+          action: () => { navigate("/dashboard/notes"); onClose(); }
         }));
         const allHabits = (habitsRes.habits || []).map(h => ({
           id: h.id,
           type: "Habit",
           title: h.title,
-          action: () => { navigate("/habits"); onClose(); }
+          action: () => { navigate("/dashboard/habits"); onClose(); }
         }));
         setSearchableData(prev => [...prev, ...allNotes, ...allHabits]);
       });

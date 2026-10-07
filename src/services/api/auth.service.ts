@@ -31,4 +31,9 @@ export const authService = {
       method: "PATCH",
       body: JSON.stringify(patch),
     }),
+
+  deleteAccount: () =>
+    request<{ success: true; message: string }>("/auth/me", {
+      method: "DELETE",
+    }),
 };

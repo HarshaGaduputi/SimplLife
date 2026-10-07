@@ -7,14 +7,14 @@
     "dev": "concurrently \"npm run client:dev\" \"npm run server:dev\"",
     "client:dev": "vite",
     "server:dev": "nodemon",
-    "build": "tsc -b && vite build",
-    "start": "node dist/server.js",
+    "build": "tsc -b && tsc -p tsconfig.server.json && vite build",
+    "start": "node dist-server/api/server.js",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"api/**/*.ts\"",
-    "test": "echo \"No tests configured yet. See docs/TODO.md\" && exit 0"
+    "test": "vitest run"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",

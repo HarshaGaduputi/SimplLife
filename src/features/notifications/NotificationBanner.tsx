@@ -21,23 +21,23 @@ export function NotificationBanner() {
       const res = await tasksService.listUpcoming();
       if (!res.tasks || res.tasks.length === 0) return;
 
-      const todayStr = new Date().toISOString().split("T")[0];
+      const now = new Date();
+      const todayStr = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
       const notifiedSet = new Set(
         JSON.parse(sessionStorage.getItem("notified-tasks") || "[]"),
       );
 
-      const now = new Date();
       const targetTime = new Date();
       targetTime.setHours(9, 0, 0, 0); // 09:00 AM local time
 
       for (const t of res.tasks) {
         if (t.dueDate?.startsWith(todayStr) && !notifiedSet.has(t.id)) {
-          const delay = Math.max(0, targetTime.getTime() - now.getTime());
+          const delay = targetTime.getTime() > now.getTime() ? targetTime.getTime() - now.getTime() : 0;
           setTimeout(() => {
             if ("Notification" in window && Notification.permission === "granted") {
               new Notification("SimplLife Reminder", {
                 body: `Due today: ${t.title}`,
-                icon: "/favicon.ico",
+                icon: "/favicon.svg",
               });
               notifiedSet.add(t.id);
               sessionStorage.setItem(

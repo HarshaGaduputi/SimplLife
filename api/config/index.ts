@@ -3,9 +3,9 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const isProduction = process.env.NODE_ENV === "production";
-const jwtSecret = (process.env.JWT_SECRET as string) || "tasknest-dev-secret-change-me";
+const jwtSecret = (process.env.JWT_SECRET as string) || "simpllife-dev-secret-change-me";
 
-if (isProduction && (jwtSecret === "tasknest-dev-secret-change-me" || jwtSecret === "tasknest-dev-secret-change-me-in-production")) {
+if (isProduction && (jwtSecret === "simpllife-dev-secret-change-me" || jwtSecret === "tasknest-dev-secret-change-me" || jwtSecret === "tasknest-dev-secret-change-me-in-production")) {
   throw new Error("FATAL: Default JWT_SECRET is not allowed in production.");
 }
 
@@ -29,14 +29,17 @@ export const config = {
   cors: {
     origin: process.env.CORS_ORIGIN || "http://localhost:5173",
   },
+  cookie: {
+    sameSite: (process.env.COOKIE_SAME_SITE || (isProduction ? "none" : "lax")) as "lax" | "strict" | "none",
+  },
   rateLimit: {
     general: {
       windowMs: 60_000,
-      max: 200,
+      max: isProduction ? 200 : 999_999,
     },
     auth: {
       windowMs: 10 * 60 * 1000,
-      max: 20,
+      max: isProduction ? 20 : 999_999,
     },
   },
   ai: {
@@ -57,4 +60,5 @@ export const config = {
     fromEmail: process.env.SMTP_FROM_EMAIL || "no-reply@simpllife.com",
     fromName: process.env.SMTP_FROM_NAME || "SimplLife",
   },
+  resendApiKey: process.env.RESEND_API_KEY || "",
 };

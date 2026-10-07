@@ -31,10 +31,10 @@ export function ActivityFeed() {
     <div className="p-6 md:p-8 lg:p-12 space-y-8 max-w-4xl mx-auto">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Badge variant="primary" size="md">Workspace Logs</Badge>
-          <h1 className="mt-3 text-h1 font-bold text-text-strong tracking-tight">Real-time Activity Feed</h1>
+          <Badge variant="primary" size="md">Recent Activity</Badge>
+          <h1 className="mt-3 text-h1 font-bold text-text-strong tracking-tight">Activity Feed</h1>
           <p className="mt-2 text-body text-text-muted">
-            Track all changes, tasks created, achievements logged, and team collaborations.
+            Track recent changes, completed tasks, and productivity milestones.
           </p>
         </div>
         <button

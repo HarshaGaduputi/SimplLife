@@ -40,10 +40,7 @@ export function SmartSearchBar() {
   // Cmd+K shortcut listener
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      } else if (e.key === "?" && !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName)) {
+      if (e.key === "?" && !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement)?.tagName)) {
         e.preventDefault();
         setShortcutsModalOpen(true);
       } else if (e.altKey && e.key.toLowerCase() === "g") {

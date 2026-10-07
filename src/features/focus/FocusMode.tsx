@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Maximize2, Minimize2, Award, CheckCircle2, Circle } from "lucide-react";
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Maximize2, Minimize2, Award } from "lucide-react";
 import { focusService } from "@/services/api";
 import { Button } from "@/components/ui";
 import { useToastStore } from "@/stores/toastStore";
@@ -101,7 +101,7 @@ export function FocusPage() {
       toast({ kind: "success", message: "Pomodoro session complete! Take a break." });
       const task = allActiveTasks.find(t => t.id === selectedTaskId);
       try {
-        await focusService.create({ duration: config.work / 60, taskTitle: task ? task.title : "Pomodoro Work Session" });
+        await focusService.create({ duration: config.work / 60, taskId: task?.id ?? null, taskTitle: task ? task.title : "Pomodoro Work Session" });
         await loadHistory();
       } catch {
         // quiet failure
@@ -116,16 +116,36 @@ export function FocusPage() {
 
   // Timer Core logic
   useEffect(() => {
+    const saved = localStorage.getItem("simpllife-focus-session");
+    if (saved) {
+      try {
+        const state = JSON.parse(saved) as { sessionType: typeof sessionType; endAt: number };
+        if (state.sessionType === sessionType && state.endAt > Date.now()) {
+          setTimeLeft(Math.ceil((state.endAt - Date.now()) / 1000));
+          setIsRunning(true);
+        } else {
+          localStorage.removeItem("simpllife-focus-session");
+        }
+      } catch {
+        localStorage.removeItem("simpllife-focus-session");
+      }
+    }
+  // Restore only once when the focus page opens.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if (isRunning) {
       timerRef.current = window.setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            void handleSessionComplete();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+        const saved = localStorage.getItem("simpllife-focus-session");
+        const endAt = saved ? Number((JSON.parse(saved) as { endAt: number }).endAt) : Date.now() + timeLeft * 1000;
+        const remaining = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
+        setTimeLeft(remaining);
+        if (remaining === 0) {
+          localStorage.removeItem("simpllife-focus-session");
+          void handleSessionComplete();
+        }
+      }, 250);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
     }
@@ -133,12 +153,23 @@ export function FocusPage() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isRunning, handleSessionComplete]);
+  }, [isRunning, handleSessionComplete, timeLeft]);
 
   function resetTimer() {
     setIsRunning(false);
+    localStorage.removeItem("simpllife-focus-session");
     setTimeLeft(config[sessionType]);
     if (timerRef.current) clearInterval(timerRef.current);
+  }
+
+  function toggleRunning() {
+    if (isRunning) {
+      localStorage.removeItem("simpllife-focus-session");
+      setIsRunning(false);
+      return;
+    }
+    localStorage.setItem("simpllife-focus-session", JSON.stringify({ sessionType, endAt: Date.now() + timeLeft * 1000 }));
+    setIsRunning(true);
   }
 
   // Format MM:SS
@@ -273,7 +304,7 @@ export function FocusPage() {
           <Button
             variant="primary"
             size="lg"
-            onClick={() => setIsRunning(!isRunning)}
+            onClick={toggleRunning}
             className="w-20 h-20 rounded-full p-0 flex items-center justify-center shadow-lg shrink-0"
           >
             {isRunning ? <Pause size={32} /> : <Play size={32} className="ml-1" />}

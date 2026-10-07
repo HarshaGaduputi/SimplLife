@@ -1,6 +1,8 @@
 import { getDb } from "../db.js";
 import type { CalendarEvent } from "../../shared/types.js";
 
+type CalendarEventInput = Partial<Omit<CalendarEvent, "id" | "userId" | "createdAt" | "updatedAt">> & { title: string; date: string };
+
 export const calendarRepository = {
   async list(userId: string): Promise<CalendarEvent[]> {
     const db = getDb();
@@ -12,7 +14,7 @@ export const calendarRepository = {
     return db.getCalendarEvent(id);
   },
 
-  async create(userId: string, params: Partial<CalendarEvent>): Promise<CalendarEvent> {
+  async create(userId: string, params: CalendarEventInput): Promise<CalendarEvent> {
     const db = getDb();
     return db.createCalendarEvent(userId, params);
   },

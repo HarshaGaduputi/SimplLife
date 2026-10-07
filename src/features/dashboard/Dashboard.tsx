@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Undo2, Redo2, Plus, ChevronDown, Trash2, FileText, ArrowRight, ArrowDownUp, Zap, Flag, Brain } from "lucide-react";
-import { groupsService, tasksService, stateService, trashService, HttpError, aiApiService } from "../../services/api";
+import { groupsService, tasksService, trashService, HttpError, aiApiService } from "../../services/api";
 import { useTasksStore } from "../../stores/tasksStore";
 import { useUIStore } from "../../stores/uiStore";
 import { useFiltersStore } from "../../stores/filtersStore";
@@ -76,7 +76,6 @@ export function DashboardPage() {
 
   const [newGroupName, setNewGroupName] = useState("");
   const [creating, setCreating] = useState(false);
-  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const canUndo = historyIndex >= 0;
   const canRedo = historyIndex < history.length - 1 && history.length > 0;
@@ -95,14 +94,10 @@ export function DashboardPage() {
           ...s,
           tasksByGroup: { ...s.tasksByGroup, ...emptyMap },
         }));
+        const tres = await tasksService.listAll();
+        if (cancelled) return;
         for (const g of res.groups) {
-          try {
-            const tres = await tasksService.list(g.id);
-            if (cancelled) return;
-            setTasks(g.id, tres.tasks);
-          } catch {
-            /* ignore per group failure */
-          }
+          setTasks(g.id, tres.tasks.filter((task) => task.groupId === g.id));
         }
         setLoaded(true);
       } catch (e) {
@@ -162,12 +157,12 @@ export function DashboardPage() {
   }
 
   const handleUndo = useCallback(() => {
-    toast({ kind: "info", message: "Undo is currently disabled in cloud mode." });
-  }, [toast]);
+    if (undo()) toast({ kind: "info", message: "Last local task change undone." });
+  }, [toast, undo]);
 
   const handleRedo = useCallback(() => {
-    toast({ kind: "info", message: "Redo is currently disabled in cloud mode." });
-  }, [toast]);
+    if (redo()) toast({ kind: "info", message: "Last local task change redone." });
+  }, [toast, redo]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -246,7 +241,7 @@ export function DashboardPage() {
 
   // Calculate Today's Focus tasks
   const todaysFocusTasks = useMemo(() => {
-    let allActive: { task: Task; groupId: string }[] = [];
+    const allActive: { task: Task; groupId: string }[] = [];
     for (const g of groups) {
       const active = (tasksByGroup[g.id] || []).filter(t => !t.completed);
       for (const t of active) {
@@ -624,9 +619,9 @@ function GroupPanel({
     }
   }
 
-  const priorityWeight = { high: 3, medium: 2, low: 1, none: 0 };
   const sortedActiveTasks = useMemo(() => {
     if (sortBy === "default") return activeTasks;
+    const priorityWeight = { urgent: 4, high: 3, medium: 2, low: 1, none: 0 };
     return [...activeTasks].sort((a, b) => {
       if (sortBy === "priority") {
         const wA = priorityWeight[a.priority as keyof typeof priorityWeight] || 0;
@@ -663,8 +658,8 @@ function GroupPanel({
       for (const p of res.priorities) {
         const task = newTasks.find(t => t.id === p.id);
         if (task && task.priority !== p.priority) {
-          task.priority = p.priority as any;
-          await tasksService.update(p.id, { priority: p.priority as any });
+          task.priority = p.priority as Task["priority"];
+          await tasksService.update(p.id, { priority: p.priority as Task["priority"] });
         }
       }
       const fresh = await tasksService.list(group.id);

@@ -38,15 +38,15 @@ export class NotificationService {
             console.error(`[NotificationService] Cannot send email: No recipient email provided for user ${item.userId}`);
             continue;
           }
-          if (!config.smtp.pass) {
-            console.warn(`[NotificationService] No Resend API Key (SMTP_PASS) found. Simulating email to ${recipient}: "${item.title}"`);
+          if (!config.resendApiKey) {
+            console.warn(`[NotificationService] RESEND_API_KEY is not configured; email skipped for ${recipient}.`);
             continue;
           }
 
           const res = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: {
-              "Authorization": `Bearer ${config.smtp.pass}`,
+              "Authorization": `Bearer ${config.resendApiKey}`,
               "Content-Type": "application/json"
             },
             body: JSON.stringify({
@@ -64,8 +64,7 @@ export class NotificationService {
           
           console.log(`[NotificationService] Email delivered successfully to ${recipient}: "${item.title}"`);
         } else {
-          // Delivery stub – simulates sending push/slack
-          console.log(`[NotificationService] Delivered ${item.type} notification: "${item.body}"`);
+          throw new Error(`${item.type} notifications are not configured for this deployment`);
         }
       } catch (err) {
         console.error(`[NotificationService] Delivery failed for ${item.type} to ${item.userId || item.email}:`, err);

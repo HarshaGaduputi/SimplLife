@@ -5,7 +5,7 @@ export const focusService = {
   list: () =>
     request<{ success: true; sessions: FocusSession[] }>("/focus"),
 
-  create: (payload: { duration: number; taskTitle?: string | null }) =>
+  create: (payload: { duration: number; taskId?: string | null; taskTitle?: string | null }) =>
     request<{ success: true; session: FocusSession }>("/focus", {
       method: "POST",
       body: JSON.stringify(payload),

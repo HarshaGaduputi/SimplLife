@@ -7,7 +7,18 @@ import { notificationService } from "./services/notification.service.js";
 export function initCronJobs() {
   logger.info("Registered daily background tasks.");
 
-  setInterval(() => {
+  const scheduleDaily = (hour: number, job: () => void) => {
+    const next = new Date();
+    next.setHours(hour, 0, 0, 0);
+    if (next.getTime() <= Date.now()) next.setDate(next.getDate() + 1);
+    const delay = next.getTime() - Date.now();
+    setTimeout(() => {
+      job();
+      setInterval(job, 24 * 60 * 60 * 1000);
+    }, delay);
+  };
+
+  const emptyTrash = () => {
     void (async () => {
       try {
         const deleted = await TrashService.autoEmpty(30);
@@ -18,9 +29,10 @@ export function initCronJobs() {
         logger.error("Error auto-emptying trash:", err);
       }
     })();
-  }, 24 * 60 * 60 * 1000);
+  };
+  scheduleDaily(3, emptyTrash);
 
-  setInterval(() => {
+  const sendDigest = () => {
     void (async () => {
       try {
         const users = await userRepository.listAll();
@@ -60,5 +72,6 @@ export function initCronJobs() {
         logger.error("Error sending daily digest:", err);
       }
     })();
-  }, 24 * 60 * 60 * 1000);
+  };
+  scheduleDaily(9, sendDigest);
 }

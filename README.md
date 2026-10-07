@@ -8,14 +8,14 @@
 - **Group‑centric workflow** – organise tasks under people or categories.
 - **Subtasks, descriptions, templates** – rich task details with one‑click template insertion.
 - **Priority flags & due‑date chips** – colour‑coded urgency indicators.
-- **Undo / Redo** – 50‑step history with state synchronization.
+- **Undo / Redo** – 50-step local task history.
 - **Smart Search** – debounced in‑memory filtering, term highlighting, and filter chips.
 - **AI Subtask Split** – magic‑wand icon to generate subtasks via OpenAI (fallback rules).
 - **Calendar view** – CSS‑grid month view with priority‑coded tasks.
 - **Recycle Bin (Trash)** – soft‑delete, restore, permanent delete, empty‑all, with toast actions.
 - **Activity Log** – timeline of user actions with pagination.
 - **Export / Import** – JSON data backup and restore.
-- **Push notifications & daily digest email** – reminder banner and scheduled email.
+- **Browser reminders & daily digest email** – opt-in browser reminders and scheduled email when configured.
 - **Keyboard shortcuts modal** – `?` opens a cheatsheet, plus shortcuts for create, undo, redo, navigation, etc.
 - **Responsive design** – desktop, tablet, mobile layouts with a floating theme toggle.
 
@@ -25,7 +25,7 @@
 - **Frontend**: React + TypeScript, Vite, Tailwind CSS, React Router, Zustand for state management.
 - **Backend**: Node.js + Express, PostgreSQL (fallback in‑memory DB), JWT authentication.
 - **AI**: OpenAI `gpt‑4o‑mini` (with rule‑based fallback).
-- **Email**: Node‑cron + Nodemailer for daily digest.
+- **Email**: scheduled background jobs with Resend delivery when `RESEND_API_KEY` is configured.
 - **Build**: Vite, TypeScript, ESLint, Prettier.
 
 ---
@@ -53,7 +53,7 @@ Open `http://localhost:5173` in your browser.
 ## 📜 Scripts
 - `npm run dev` – start Vite dev server.
 - `npm run build` – build production bundle.
-- `npm run check` – TypeScript type‑check.
+- `npm run type-check` – TypeScript type-check.
 - `npm run lint` – run ESLint.
 - `npm run start` – start the built server (after `npm run build`).
 

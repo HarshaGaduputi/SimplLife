@@ -12,12 +12,13 @@ export function parseNoteToTodo(content: string): ParsedTodo[] {
 
   // Helper to determine indentation level (2 spaces = 1 level)
   const getIndentLevel = (line: string) => {
-    const match = line.match(/^(\s*)/);
+    const normalized = line.replace(/\t/g, "  ");
+    const match = normalized.match(/^(\s*)/);
     if (!match) return 0;
     return Math.floor(match[1].length / 2);
   };
 
-  for (let line of lines) {
+  for (const line of lines) {
     if (!line.trim()) continue;
 
     const level = getIndentLevel(line);

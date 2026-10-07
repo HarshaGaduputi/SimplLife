@@ -2,7 +2,6 @@
 
 export const APP_NAME = "SimplLife" as const;
 
-export const TOKEN_KEY = "simpllife-token" as const;
 export const THEME_KEY = "simpllife-theme" as const;
 
 export const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "/api";

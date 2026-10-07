@@ -3,6 +3,7 @@ import type { PriorityLevel } from "../../shared/types";
 
 export const PRIORITY_OPTIONS: Array<{ value: PriorityFilter; label: string; color: string }> = [
   { value: "all", label: "All priorities", color: "var(--color-text-muted)" },
+  { value: "urgent", label: "Urgent", color: "var(--color-danger)" },
   { value: "high", label: "High", color: "var(--color-danger)" },
   { value: "medium", label: "Medium", color: "var(--color-warning)" },
   { value: "low", label: "Low", color: "var(--color-success)" },
@@ -10,6 +11,7 @@ export const PRIORITY_OPTIONS: Array<{ value: PriorityFilter; label: string; col
 ];
 
 export const PRIORITY_COLORS: Record<PriorityLevel | "none", string> = {
+  urgent: "var(--color-danger)",
   high: "var(--color-danger)",
   medium: "var(--color-warning)",
   low: "var(--color-success)",

@@ -1,5 +1,5 @@
 export type ThemeMode = "light" | "dark";
-export type PriorityLevel = "high" | "medium" | "low" | "none";
+export type PriorityLevel = "urgent" | "high" | "medium" | "low" | "none";
 
 export interface User {
   id: string;
@@ -93,6 +93,7 @@ export interface FocusSession {
   id: string;
   userId: string;
   duration: number; // in minutes
+  taskId?: string | null;
   taskTitle?: string | null;
   createdAt: string;
 }
@@ -196,7 +197,7 @@ export interface TrashData {
 }
 
 export interface AuthResponse {
-  token: string;
+  token?: string;
   user: User;
 }
 

@@ -24,7 +24,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     try {
       const events = await calendarService.listEvents();
       set({ events, initialized: true, loading: false });
-    } catch (err: any) {
+    } catch {
       set({ loading: false });
       useToastStore.getState().toast({
         message: "Error fetching events",
@@ -38,7 +38,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       const newEvent = await calendarService.createEvent(params);
       set((state) => ({ events: [...state.events, newEvent] }));
       return newEvent;
-    } catch (err: any) {
+    } catch {
       useToastStore.getState().toast({
         message: "Error creating event",
         kind: "error",
@@ -52,7 +52,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       set((state) => ({
         events: state.events.map((e) => (e.id === id ? updated : e)),
       }));
-    } catch (err: any) {
+    } catch {
       useToastStore.getState().toast({
         message: "Error updating event",
         kind: "error",
@@ -66,7 +66,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
       set((state) => ({
         events: state.events.filter((e) => e.id !== id),
       }));
-    } catch (err: any) {
+    } catch {
       useToastStore.getState().toast({
         message: "Error deleting event",
         kind: "error",

@@ -84,7 +84,7 @@ Multiple focused Zustand stores (instead of one monolith):
 
 | Store | Responsibility |
 |-------|---------------|
-| `authStore` | User session, token, hydration |
+| `authStore` | User session and hydration; the JWT remains in an HttpOnly cookie |
 | `themeStore` | Light/dark theme, persistence |
 | `toastStore` | Toast notification queue |
 | `filtersStore` | Search query + active filters |
@@ -191,7 +191,7 @@ HTTP PATCH /api/tasks/:id
   ↓
 express.json() parser
   ↓
-requireAuth middleware  →  extracts Bearer token → verifies JWT → loads user → sets req.userId
+requireAuth middleware  →  extracts the HttpOnly cookie → verifies JWT → loads user → sets req.userId
   ↓
 validate(UpdateTaskSchema)  →  Zod safeParse(req.body) → on failure: next(ApiError(400, issues))
   ↓

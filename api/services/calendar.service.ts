@@ -3,12 +3,14 @@ import { ApiError } from "../utils/helpers.js";
 import type { CalendarEvent } from "../../shared/types.js";
 import { getDb } from "../db.js";
 
+type CalendarEventInput = Partial<Omit<CalendarEvent, "id" | "userId" | "createdAt" | "updatedAt">> & { title: string; date: string };
+
 export class CalendarService {
   static async listEvents(userId: string): Promise<CalendarEvent[]> {
     return calendarRepository.list(userId);
   }
 
-  static async createEvent(userId: string, params: any): Promise<CalendarEvent> {
+  static async createEvent(userId: string, params: CalendarEventInput): Promise<CalendarEvent> {
     if (!params.title || !params.date) {
       throw new ApiError("Title and date are required", 400);
     }
@@ -23,7 +25,7 @@ export class CalendarService {
     return event;
   }
 
-  static async updateEvent(userId: string, id: string, patch: any): Promise<CalendarEvent> {
+  static async updateEvent(userId: string, id: string, patch: Partial<CalendarEventInput>): Promise<CalendarEvent> {
     const existing = await calendarRepository.get(id);
     if (!existing || existing.userId !== userId) {
       throw new ApiError("Event not found", 404);

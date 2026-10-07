@@ -10,8 +10,12 @@ const { Pool } = pg;
 
 export async function runMigrations() {
   if (!process.env.DATABASE_URL) {
-    console.error('[SimplLife DB] FATAL: DATABASE_URL is required in production.');
-    process.exit(1);
+    if (config.isProduction) {
+      console.error('[SimplLife DB] FATAL: DATABASE_URL is required in production.');
+      process.exit(1);
+    }
+    console.log('[SimplLife DB] Skipping migrations – running in demo mode (in-memory DB).');
+    return;
   }
 
   const pool = new Pool({

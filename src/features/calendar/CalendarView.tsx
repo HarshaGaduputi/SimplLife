@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, X, Plus, Clock, Flag } from "lucide-react";
 import { groupsService, tasksService } from "../../services/api";
 import { useTasksStore } from "../../stores/tasksStore";
 import { useCalendarStore } from "../../stores/calendarStore";
-import type { Group, Task } from "../../../shared/types";
+import type { CalendarEvent, Group, Task } from "../../../shared/types";
 
 export function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -34,12 +34,8 @@ export function CalendarView() {
         const gRes = await groupsService.list();
         setGroups(gRes.groups as Group[]);
 
-        const allTasks: Task[] = [];
-        for (const g of gRes.groups) {
-          const tRes = await tasksService.list(g.id);
-          allTasks.push(...tRes.tasks);
-        }
-        setTasks(allTasks);
+        const tRes = await tasksService.listAll();
+        setTasks(tRes.tasks);
       } catch (e) {
         console.error("Calendar load error", e);
       } finally {
@@ -82,7 +78,7 @@ export function CalendarView() {
     }
   }
 
-  const calendarEventsByDate: Record<string, any[]> = {};
+  const calendarEventsByDate: Record<string, CalendarEvent[]> = {};
   for (const e of dbEvents) {
     const key = e.date;
     if (!calendarEventsByDate[key]) calendarEventsByDate[key] = [];

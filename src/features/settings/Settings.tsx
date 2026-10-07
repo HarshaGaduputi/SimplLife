@@ -117,7 +117,7 @@ export function SettingsPage() {
 
       const a = document.createElement("a");
       a.href = url;
-      a.download = `tasknest-export-${todayStr}.json`;
+      a.download = `simpllife-export-${todayStr}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -197,10 +197,8 @@ export function SettingsPage() {
   async function handleDeleteAccount() {
     setDeleting(true);
     try {
-      // In a real app, this would call a DELETE /auth/me or similar endpoint
-      // await authService.deleteAccount();
+      await authService.deleteAccount();
       localStorage.clear();
-      await authService.logout();
       setUser(null);
       navigate("/login");
       toast({ kind: "success", message: "Account deleted successfully." });

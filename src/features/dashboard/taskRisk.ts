@@ -37,8 +37,8 @@ export function calculateTaskRisk(task: Task): TaskRisk {
 
   // Check subtasks complexity vs time left
   // Note: we'd need subtasks populated on the Task object.
-  if ((task as any).subtasks && (task as any).subtasks.length > 0 && task.dueDate) {
-    const uncompletedSubtasks = (task as any).subtasks.filter((s: any) => !s.completed).length;
+  if (task.subtasks.length > 0 && task.dueDate) {
+    const uncompletedSubtasks = task.subtasks.filter((s) => !s.completed).length;
     const due = new Date(task.dueDate);
     const daysLeft = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
 
@@ -49,8 +49,8 @@ export function calculateTaskRisk(task: Task): TaskRisk {
 
   if (level === "none") {
     // If no deadline, check if it's been sitting around
-    if ((task as any).createdAt) {
-      const created = new Date((task as any).createdAt);
+    if (task.createdAt) {
+      const created = new Date(task.createdAt);
       const daysOld = (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
       if (daysOld > 14) {
         return { level: "medium", reason: "Stale task" };

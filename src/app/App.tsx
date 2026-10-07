@@ -3,7 +3,6 @@ import {
   BrowserRouter,
   Routes,
   Route,
-  Navigate,
   useLocation,
   Link,
 } from "react-router-dom";
@@ -28,6 +27,7 @@ import { FocusPage } from "@/features/focus/FocusMode";
 import { NotesPage } from "@/features/notes/Notes";
 import { JournalPage } from "@/features/journal/Journal";
 import { AnalyticsPage } from "@/features/analytics/Analytics";
+import { ActivityFeed } from "@/features/activity/ActivityFeed";
 import { ProtectedRoute } from "@/layouts/ProtectedRoute";
 import { useAuthStore } from "@/stores/authStore";
 import { AIChat, AIChatButton } from "@/features/ai/AIChat";
@@ -140,6 +140,16 @@ function NotFoundPage() {
   );
 }
 
+function AboutPage() {
+  return (
+    <div className="max-w-3xl mx-auto px-6 py-20">
+      <p className="text-sm font-semibold uppercase tracking-widest text-primary">About SimplLife</p>
+      <h1 className="mt-3 text-4xl font-bold text-text-strong">A calmer place for the work that matters.</h1>
+      <p className="mt-6 text-lg leading-8 text-text-muted">SimplLife brings tasks, notes, goals, habits, focus sessions, and reflections into one focused workspace.</p>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -165,6 +175,7 @@ export default function App() {
               </Shell>
             }
           />
+          <Route path="/about" element={<Shell variant="marketing"><AboutPage /></Shell>} />
           <Route
             path="/templates"
             element={
@@ -301,6 +312,16 @@ export default function App() {
               <ProtectedRoute>
                 <Shell variant="dashboard">
                   <AnalyticsPage />
+                </Shell>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/activity"
+            element={
+              <ProtectedRoute>
+                <Shell variant="dashboard">
+                  <ActivityFeed />
                 </Shell>
               </ProtectedRoute>
             }

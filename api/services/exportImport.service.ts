@@ -9,7 +9,7 @@ export class ExportImportService {
       throw new ApiError("User data not found", 404);
     }
     const todayStr = new Date().toISOString().split("T")[0];
-    const filename = `tasknest-export-${todayStr}.json`;
+    const filename = `simpllife-export-${todayStr}.json`;
     return { data, filename };
   }
 

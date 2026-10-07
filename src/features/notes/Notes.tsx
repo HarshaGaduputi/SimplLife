@@ -52,7 +52,7 @@ export function NotesPage() {
         });
         setNotes((prev) => prev.map((n) => (n.id === selectedNote.id ? res.note : n)));
         setSelectedNote(res.note);
-      } catch (e) {
+      } catch {
         // silent error for autosave
       } finally {
         setSaving(false);
@@ -154,11 +154,6 @@ export function NotesPage() {
 
   const [isTodoList, setIsTodoList] = useState(false);
 
-  function renderText(text: string) {
-    const parts = text.split(/\*\*([^*]+)\*\*/g);
-    return parts.map((part, i) => (i % 2 === 1 ? <strong key={i} className="font-bold">{part}</strong> : part));
-  }
-
   function handleContentKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     const textarea = e.currentTarget;
     const { selectionStart, selectionEnd, value } = textarea;
@@ -211,8 +206,21 @@ export function NotesPage() {
 
     if (e.key === "Tab") {
       e.preventDefault();
+      const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
+      const lineEndIndex = value.indexOf("\n", selectionStart);
+      const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
+      const currentLine = value.slice(lineStart, lineEnd);
+      if (e.shiftKey) {
+        const removeCount = currentLine.startsWith("\t") ? 1 : currentLine.startsWith("  ") ? 2 : 0;
+        if (!removeCount) return;
+        const newValue = value.slice(0, lineStart) + currentLine.slice(removeCount) + value.slice(lineEnd);
+        setContent(newValue);
+        const nextPosition = Math.max(lineStart, selectionStart - removeCount);
+        setTimeout(() => { textarea.selectionStart = textarea.selectionEnd = nextPosition; }, 0);
+        return;
+      }
       const insertion = "  ";
-      const newValue = value.substring(0, selectionStart) + insertion + value.substring(selectionEnd);
+      const newValue = value.substring(0, lineStart) + insertion + value.substring(lineStart);
       setContent(newValue);
       setTimeout(() => {
         textarea.selectionStart = textarea.selectionEnd = selectionStart + insertion.length;
@@ -245,12 +253,14 @@ export function NotesPage() {
       for (const todo of parsedTodos) {
         const taskRes = await tasksService.create(groupId, { title: todo.title });
         const taskId = taskRes.task.id;
+        if (todo.completed) await tasksService.update(taskId, { completed: true });
         
         // Recursive function to add subtasks, flattening deeper levels if needed
         const addSubtasks = async (subtasks: ParsedTodo[], prefix = "") => {
           for (const sub of subtasks) {
             const fullTitle = prefix ? `${prefix} ${sub.title}` : sub.title;
-            await tasksService.createSubtask(taskId, { title: fullTitle });
+            const subtaskRes = await tasksService.createSubtask(taskId, { title: fullTitle });
+            if (sub.completed) await tasksService.updateSubtask(subtaskRes.subtask.id, { completed: true });
             if (sub.subtasks.length > 0) {
               await addSubtasks(sub.subtasks, fullTitle + " -");
             }

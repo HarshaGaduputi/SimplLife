@@ -5,7 +5,7 @@
 ### 🔐 Authentication
 - Register / login / logout with JWT-based sessions
 - `useAuthStore` on the client manages hydration on page reload
-- Token persisted in `localStorage` under `simpllife-token`
+- Authentication uses an HttpOnly cookie; no client JWT is stored in `localStorage`.
 - `ProtectedRoute` wrapper guards dashboard routes
 
 ### ✅ Task Management

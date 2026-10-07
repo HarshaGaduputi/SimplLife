@@ -1,5 +1,4 @@
 import pg from 'pg';
-import { config } from './config/index.js';
 import type {
   ActivityLog,
   ExportData,
@@ -17,8 +16,13 @@ import type {
   TrashData,
   CalendarEvent,
 } from "../shared/types.js";
+import { SEED_TEMPLATES } from "./services/seedTemplates.service.js";
 
 const { Pool } = pg;
+
+type ExportGroupRow = { id: string; name: string; position: number };
+type ExportTaskRow = { id: string; title: string; description: string | null; priority: PriorityLevel | null; due_date: Date | string | null; completed: boolean; position: number };
+type ExportSubtaskRow = { title: string; completed: boolean; position: number };
 
 function uid(prefix = "id"): string {
   return prefix + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
@@ -217,7 +221,6 @@ export class PostgresDatabase {
     if (patch.startTime !== undefined) { updates.push(`start_time = $${i++}`); params.push(patch.startTime); }
     if (patch.endTime !== undefined) { updates.push(`end_time = $${i++}`); params.push(patch.endTime); }
     if (patch.type !== undefined) { updates.push(`event_type = $${i++}`); params.push(patch.type); }
-    if (patch.reminderAt !== undefined) { updates.push(`reminder_at = $${i++}`); params.push(patch.reminderAt); }
     if (patch.completed !== undefined) { updates.push(`completed = $${i++}`); params.push(patch.completed); }
     
     if (updates.length > 0) {
@@ -558,7 +561,7 @@ export class PostgresDatabase {
   }
 
   // ===== Sync State =====
-  async syncState(userId: string, groups: Group[]): Promise<void> {
+  async syncState(_userId: string, _groups: Group[]): Promise<void> {
     // We shouldn't blindly sync state for production, but to satisfy the interface for now:
     console.warn('[SimplLife DB] Full state sync is not recommended. Make specific API mutations instead.');
   }
@@ -586,38 +589,72 @@ export class PostgresDatabase {
   }
 
   async restoreTrashItem(userId: string, type: 'group' | 'task' | 'subtask', id: string): Promise<boolean> {
-    let table = type === 'group' ? 'groups' : type === 'task' ? 'tasks' : 'subtasks';
-    const res = await this.query(`UPDATE ${table} SET deleted_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING *`, [id]);
-    if (res.length === 0) return false;
-    
-    if (type === 'group') {
-      await this.query(`UPDATE tasks SET deleted_at = NULL, updated_at = NOW() WHERE group_id = $1`, [id]);
-      await this.query(`UPDATE subtasks SET deleted_at = NULL, updated_at = NOW() WHERE task_id IN (SELECT id FROM tasks WHERE group_id = $1)`, [id]);
-    } else if (type === 'task') {
-      await this.query(`UPDATE subtasks SET deleted_at = NULL, updated_at = NOW() WHERE task_id = $1`, [id]);
-      const task = res[0] as any;
-      await this.query(`UPDATE groups SET deleted_at = NULL, updated_at = NOW() WHERE id = $1`, [task.group_id]);
-    } else if (type === 'subtask') {
-      const sub = res[0] as any;
-      const taskRes = await this.queryOne(`UPDATE tasks SET deleted_at = NULL, updated_at = NOW() WHERE id = $1 RETURNING *`, [sub.task_id]) as any;
-      if (taskRes) {
-        await this.query(`UPDATE groups SET deleted_at = NULL, updated_at = NOW() WHERE id = $1`, [taskRes.group_id]);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      let ownerQuery: string;
+      if (type === 'group') ownerQuery = 'SELECT id FROM groups WHERE id = $1 AND user_id = $2';
+      else if (type === 'task') ownerQuery = 'SELECT id, group_id FROM tasks WHERE id = $1 AND user_id = $2';
+      else ownerQuery = 'SELECT s.id, s.task_id, t.group_id FROM subtasks s JOIN tasks t ON t.id = s.task_id WHERE s.id = $1 AND t.user_id = $2';
+      const owned = await client.query(ownerQuery, [id, userId]);
+      if (owned.rowCount === 0) { await client.query('ROLLBACK'); return false; }
+
+      if (type === 'group') {
+        await client.query('UPDATE groups SET deleted_at = NULL, updated_at = NOW() WHERE id = $1 AND user_id = $2', [id, userId]);
+        await client.query('UPDATE tasks SET deleted_at = NULL, updated_at = NOW() WHERE group_id = $1 AND user_id = $2', [id, userId]);
+        await client.query('UPDATE subtasks SET deleted_at = NULL, updated_at = NOW() WHERE task_id IN (SELECT id FROM tasks WHERE group_id = $1 AND user_id = $2)', [id, userId]);
+      } else if (type === 'task') {
+        const task = owned.rows[0];
+        await client.query('UPDATE tasks SET deleted_at = NULL, updated_at = NOW() WHERE id = $1 AND user_id = $2', [id, userId]);
+        await client.query('UPDATE subtasks SET deleted_at = NULL, updated_at = NOW() WHERE task_id = $1', [id]);
+        await client.query('UPDATE groups SET deleted_at = NULL, updated_at = NOW() WHERE id = $1 AND user_id = $2', [task.group_id, userId]);
+      } else {
+        const subtask = owned.rows[0];
+        await client.query('UPDATE subtasks SET deleted_at = NULL, updated_at = NOW() WHERE id = $1', [id]);
+        await client.query('UPDATE tasks SET deleted_at = NULL, updated_at = NOW() WHERE id = $1 AND user_id = $2', [subtask.task_id, userId]);
+        await client.query('UPDATE groups SET deleted_at = NULL, updated_at = NOW() WHERE id = $1 AND user_id = $2', [subtask.group_id, userId]);
       }
-    }
-    return true;
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally { client.release(); }
   }
 
   async emptyTrash(userId: string): Promise<number> {
-    const res = await this.query(`DELETE FROM groups WHERE user_id = $1 AND deleted_at IS NOT NULL RETURNING id`, [userId]);
-    const res2 = await this.query(`DELETE FROM tasks WHERE user_id = $1 AND deleted_at IS NOT NULL RETURNING id`, [userId]);
-    const res3 = await this.query(`DELETE FROM subtasks WHERE task_id IN (SELECT id FROM tasks WHERE user_id = $1) AND deleted_at IS NOT NULL RETURNING id`, [userId]);
-    return res.length + res2.length + res3.length;
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const subtasks = await client.query(`DELETE FROM subtasks WHERE deleted_at IS NOT NULL AND task_id IN (SELECT id FROM tasks WHERE user_id = $1 AND deleted_at IS NOT NULL) RETURNING id`, [userId]);
+      const tasks = await client.query(`DELETE FROM tasks WHERE user_id = $1 AND deleted_at IS NOT NULL RETURNING id`, [userId]);
+      const groups = await client.query(`DELETE FROM groups WHERE user_id = $1 AND deleted_at IS NOT NULL RETURNING id`, [userId]);
+      await client.query('COMMIT');
+      return (subtasks.rowCount ?? 0) + (tasks.rowCount ?? 0) + (groups.rowCount ?? 0);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally { client.release(); }
   }
 
   async deleteTrashItem(userId: string, type: 'group' | 'task' | 'subtask', id: string): Promise<boolean> {
-    let table = type === 'group' ? 'groups' : type === 'task' ? 'tasks' : 'subtasks';
-    const res = await this.query(`DELETE FROM ${table} WHERE id = $1 RETURNING id`, [id]);
-    return res.length > 0;
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      let res;
+      if (type === 'group') {
+        res = await client.query('DELETE FROM groups WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL RETURNING id', [id, userId]);
+      } else if (type === 'task') {
+        res = await client.query('DELETE FROM tasks WHERE id = $1 AND user_id = $2 AND deleted_at IS NOT NULL RETURNING id', [id, userId]);
+      } else {
+        res = await client.query('DELETE FROM subtasks WHERE id = $1 AND deleted_at IS NOT NULL AND task_id IN (SELECT id FROM tasks WHERE user_id = $2) RETURNING id', [id, userId]);
+      }
+      await client.query('COMMIT');
+      return (res.rowCount ?? 0) > 0;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally { client.release(); }
   }
 
   async autoEmptyTrashOlderThanDays(days = 30): Promise<number> {
@@ -652,11 +689,49 @@ export class PostgresDatabase {
 
   // ===== Export/Import =====
   async exportData(userId: string): Promise<ExportData | null> {
-    return null; // TODO implement full export
+    const user = await this.findUserById(userId);
+    if (!user) return null;
+    const groups = await this.query<ExportGroupRow>(`SELECT * FROM groups WHERE user_id = $1 AND deleted_at IS NULL ORDER BY position, created_at`, [userId]);
+    const exportedGroups = [];
+    for (const group of groups) {
+      const tasks = await this.query<ExportTaskRow>(`SELECT * FROM tasks WHERE group_id = $1 AND deleted_at IS NULL ORDER BY position, created_at`, [group.id]);
+      const exportedTasks = [];
+      for (const task of tasks) {
+        const subtasks = await this.query<ExportSubtaskRow>(`SELECT * FROM subtasks WHERE task_id = $1 AND deleted_at IS NULL ORDER BY position, created_at`, [task.id]);
+        const dueDate = task.due_date instanceof Date ? task.due_date.toISOString() : task.due_date;
+        exportedTasks.push({ name: task.title, description: task.description, priority: task.priority ?? 'none', due_date: dueDate, is_completed: task.completed, position: task.position, subtasks: subtasks.map((subtask) => ({ name: subtask.title, is_completed: subtask.completed, position: subtask.position })) });
+      }
+      exportedGroups.push({ name: group.name, position: group.position, tasks: exportedTasks });
+    }
+    return { exported_at: new Date().toISOString(), user: { name: user.name, email: user.email }, groups: exportedGroups };
   }
   
-  async importData(userId: string, data: ExportData) {
-    return { groupsCount: 0, tasksCount: 0, subtasksCount: 0 };
+  async importData(userId: string, data: ExportData): Promise<{ groupsCount: number; tasksCount: number; subtasksCount: number }> {
+    const client = await this.pool.connect();
+    let groupsCount = 0, tasksCount = 0, subtasksCount = 0;
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM groups WHERE user_id = $1', [userId]);
+      for (const groupDef of data.groups ?? []) {
+        const groupId = uid('grp');
+        await client.query('INSERT INTO groups (id, user_id, name, position) VALUES ($1, $2, $3, $4)', [groupId, userId, groupDef.name, groupDef.position ?? groupsCount]);
+        groupsCount++;
+        for (const taskDef of groupDef.tasks ?? []) {
+          const taskId = uid('tsk');
+          await client.query('INSERT INTO tasks (id, group_id, user_id, title, description, position, priority, due_date, completed, completed_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [taskId, groupId, userId, taskDef.name, taskDef.description ?? null, taskDef.position ?? tasksCount, taskDef.priority ?? 'none', taskDef.due_date ?? null, taskDef.is_completed ?? false, taskDef.is_completed ? new Date().toISOString() : null]);
+          tasksCount++;
+          for (const subtaskDef of taskDef.subtasks ?? []) {
+            await client.query('INSERT INTO subtasks (id, task_id, title, position, completed) VALUES ($1,$2,$3,$4,$5)', [uid('sub'), taskId, subtaskDef.name, subtaskDef.position ?? subtasksCount, subtaskDef.is_completed ?? false]);
+            subtasksCount++;
+          }
+        }
+      }
+      await client.query('COMMIT');
+      return { groupsCount, tasksCount, subtasksCount };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally { client.release(); }
   }
 
   // ===== Goals =====
@@ -670,20 +745,28 @@ export class PostgresDatabase {
       completed: row.completed,
       category: row.category,
       progress: row.progress || 0,
-      milestones: [],
+      milestones: row.milestones ?? [],
       createdAt: row.created_at?.toISOString() || new Date().toISOString(),
       updatedAt: row.updated_at?.toISOString() || new Date().toISOString(),
     };
   }
 
+  private async hydrateGoal(goal: Goal): Promise<Goal> {
+    const rows = await this.query(`SELECT id, title, completed FROM goal_milestones WHERE goal_id = $1 ORDER BY position ASC`, [goal.id]);
+    goal.milestones = rows.map((row: any) => ({ id: row.id, title: row.title, completed: row.completed }));
+    return goal;
+  }
+
   async listGoals(userId: string): Promise<Goal[]> {
     const rows = await this.query(`SELECT * FROM goals WHERE user_id = $1 ORDER BY created_at ASC`, [userId]);
-    return rows.map(this.mapGoal);
+    const goals = rows.map(this.mapGoal);
+    for (const goal of goals) await this.hydrateGoal(goal);
+    return goals;
   }
 
   async getGoal(id: string): Promise<Goal | null> {
     const row = await this.queryOne(`SELECT * FROM goals WHERE id = $1`, [id]);
-    return row ? this.mapGoal(row) : null;
+    return row ? this.hydrateGoal(this.mapGoal(row)) : null;
   }
 
   async createGoal(userId: string, params: any): Promise<Goal> {
@@ -692,7 +775,10 @@ export class PostgresDatabase {
       INSERT INTO goals (id, user_id, title, description, category, target_date, completed, progress, emoji)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
     `, [id, userId, params.title, params.description, params.category, params.targetDate, params.completed || false, params.progress || 0, params.emoji]);
-    return this.mapGoal(row);
+    for (const [position, title] of (params.milestones ?? []).entries()) {
+      await this.query(`INSERT INTO goal_milestones (id, goal_id, title, position) VALUES ($1, $2, $3, $4)`, [uid('mil'), id, title, position]);
+    }
+    return this.hydrateGoal(this.mapGoal(row));
   }
 
   async updateGoal(userId: string, id: string, patch: any): Promise<Goal | null> {
@@ -710,7 +796,14 @@ export class PostgresDatabase {
       params.push(id);
       params.push(userId);
       const row = await this.queryOne(`UPDATE goals SET ${updates.join(', ')} WHERE id = $${i} AND user_id = $${i+1} RETURNING *`, params);
-      return row ? this.mapGoal(row) : null;
+      if (!row) return null;
+      if (patch.milestones !== undefined) {
+        await this.query(`DELETE FROM goal_milestones WHERE goal_id = $1`, [id]);
+        for (const [position, milestone] of patch.milestones.entries()) {
+          await this.query(`INSERT INTO goal_milestones (id, goal_id, title, completed, position) VALUES ($1, $2, $3, $4, $5)`, [milestone.id || uid('mil'), id, milestone.title, milestone.completed, position]);
+        }
+      }
+      return this.hydrateGoal(this.mapGoal(row));
     }
     return this.getGoal(id);
   }
@@ -779,13 +872,17 @@ export class PostgresDatabase {
   }
 
   async toggleHabit(userId: string, id: string, date: string): Promise<Habit | null> {
+    const habit = await this.queryOne(`SELECT id FROM habits WHERE id = $1 AND user_id = $2`, [id, userId]);
+    if (!habit) return null;
     const existing = await this.queryOne(`SELECT id FROM habit_logs WHERE habit_id = $1 AND log_date = $2`, [id, date]);
     if (existing) {
       await this.query(`DELETE FROM habit_logs WHERE habit_id = $1 AND log_date = $2`, [id, date]);
     } else {
       await this.query(`INSERT INTO habit_logs (id, habit_id, log_date) VALUES ($1, $2, $3)`, [uid('hbl'), id, date]);
     }
-    return (await this.listHabits(userId)).find(h => h.id === id) || null;
+    const updated = (await this.listHabits(userId)).find(h => h.id === id) || null;
+    if (updated) await this.query(`UPDATE habits SET streak = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3`, [updated.streak, id, userId]);
+    return updated;
   }
 
   async deleteHabit(userId: string, id: string): Promise<boolean> {
@@ -800,21 +897,27 @@ export class PostgresDatabase {
       id: (r as any).id,
       userId: (r as any).user_id,
       duration: (r as any).duration,
+      taskId: (r as any).task_id,
       taskTitle: (r as any).task_title,
       createdAt: (r as any).created_at.toISOString(),
     }));
   }
 
-  async createFocusSession(userId: string, duration: number, taskTitle?: string | null): Promise<FocusSession> {
+  async createFocusSession(userId: string, duration: number, taskId?: string | null, taskTitle?: string | null): Promise<FocusSession> {
+    if (taskId) {
+      const ownedTask = await this.queryOne(`SELECT id FROM tasks WHERE id = $1 AND user_id = $2`, [taskId, userId]);
+      if (!ownedTask) taskId = null;
+    }
     const id = uid('foc');
     const row = await this.queryOne(`
-      INSERT INTO focus_sessions (id, user_id, duration, task_title)
-      VALUES ($1, $2, $3, $4) RETURNING *
-    `, [id, userId, duration, taskTitle || null]);
+      INSERT INTO focus_sessions (id, user_id, duration, task_id, task_title)
+      VALUES ($1, $2, $3, $4, $5) RETURNING *
+    `, [id, userId, duration, taskId || null, taskTitle || null]);
     return {
       id: (row as any).id,
       userId: (row as any).user_id,
       duration: (row as any).duration,
+      taskId: (row as any).task_id,
       taskTitle: (row as any).task_title,
       createdAt: (row as any).created_at.toISOString(),
     };
@@ -942,10 +1045,11 @@ export class PostgresDatabase {
 
   // ===== Templates =====
   async listTemplates(): Promise<Template[]> {
-    return []; // Optional implementation based on needs
+    return SEED_TEMPLATES.map((template) => ({ ...template, subtasks: template.subtasks.map((subtask) => ({ ...subtask })) }));
   }
   async getTemplate(id: string): Promise<Template | null> {
-    return null;
+    const template = SEED_TEMPLATES.find((item) => item.id === id);
+    return template ? { ...template, subtasks: template.subtasks.map((subtask) => ({ ...subtask })) } : null;
   }
 
   // ===== Activity =====
@@ -980,8 +1084,8 @@ export class PostgresDatabase {
   }
   
   // ===== Contact =====
-  async createContactMessage(params: any): Promise<void> {
-    // Log or store in separate table
+  async createContactMessage(params: { name: string; email: string; subject: string; message: string }): Promise<void> {
+    await this.query(`INSERT INTO contact_messages (id, name, email, subject, message) VALUES ($1, $2, $3, $4, $5)`, [uid('msg'), params.name, params.email, params.subject, params.message]);
   }
 
   // ===== Analytics =====

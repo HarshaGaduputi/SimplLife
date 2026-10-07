@@ -1,4 +1,4 @@
-import type { Request, Response, NextFunction } from "express";
+import type { Response, NextFunction } from "express";
 import { CalendarService } from "../services/calendar.service.js";
 import type { AuthRequest } from "../middleware/auth.js";
 

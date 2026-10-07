@@ -34,7 +34,7 @@ Create a new user account.
 
 **Response (201)**:
 ```ts
-{ success: true; token: string; user: User }
+{ success: true; user: User }
 ```
 
 ### `POST /api/auth/login`
@@ -47,27 +47,27 @@ Authenticate existing user.
 
 **Response (200)**:
 ```ts
-{ success: true; token: string; user: User }
+{ success: true; user: User }
 ```
 
 ### `GET /api/auth/me`
 Get current user from JWT.
 
-**Auth**: Bearer token
+**Auth**: HttpOnly `token` cookie set by login/register
 
 ### `PATCH /api/auth/me`
 Update user profile.
 
-**Auth**: Bearer token
+**Auth**: HttpOnly `token` cookie
 **Body**:
 ```ts
 { name?: string; digestEmailsEnabled?: boolean }
 ```
 
 ### `POST /api/auth/logout`
-Server-side logout (client discards token).
+Server-side logout clears the HttpOnly cookie.
 
-**Auth**: Bearer token
+**Auth**: HttpOnly `token` cookie
 
 ## Groups
 

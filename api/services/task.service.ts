@@ -5,6 +5,7 @@ import { activityRepository } from "../repositories/activity.repository.js";
 import { ApiError } from "../utils/helpers.js";
 import { config } from "../config/index.js";
 import type { Task, Subtask } from "../../shared/types.js";
+import { z } from "zod";
 
 export class TaskService {
   static async ensureOwnsTask(
@@ -159,19 +160,21 @@ export class TaskService {
       );
     }
 
+    const remainingSlots = Math.max(0, 5 - (task.subtasks || []).length);
     let subtaskNames: string[] = [];
+    let usedFallback = false;
     const apiKey = config.ai.apiKey;
 
     if (apiKey) {
       try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        const response = await fetch(`${config.ai.baseUrl.replace(/\/$/, "")}/chat/completions`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: "gpt-4o-mini",
+            model: config.ai.model,
             messages: [
               {
                 role: "system",
@@ -194,7 +197,8 @@ export class TaskService {
             .replace(/```json/g, "")
             .replace(/```/g, "")
             .trim();
-          subtaskNames = JSON.parse(cleaned);
+          const parsed = z.array(z.string().trim().min(1).max(160)).max(5).safeParse(JSON.parse(cleaned));
+          if (parsed.success) subtaskNames = parsed.data;
         }
       } catch (err) {
         console.warn("[AI Split] OpenAI request error, using smart fallback:", err);
@@ -203,7 +207,10 @@ export class TaskService {
 
     if (!Array.isArray(subtaskNames) || subtaskNames.length === 0) {
       subtaskNames = this.generateFallbackSubtasks(task.title);
+      usedFallback = true;
     }
+
+    subtaskNames = subtaskNames.slice(0, remainingSlots);
 
     const createdSubtasks: Subtask[] = [];
     let startPos = (task.subtasks || []).length;
@@ -222,7 +229,7 @@ export class TaskService {
       action: "ai_split",
       entityType: "task",
       entityName: task.title,
-      detail: `AI generated ${createdSubtasks.length} subtasks.`,
+      detail: `${usedFallback ? "Rule-based fallback generated" : "AI generated"} ${createdSubtasks.length} subtasks.`,
     });
 
     return createdSubtasks;

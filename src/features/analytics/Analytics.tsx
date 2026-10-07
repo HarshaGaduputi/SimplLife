@@ -3,9 +3,21 @@ import { BarChart2, CheckSquare, Clock, Flame, Calendar, Target, ShieldAlert } f
 import { analyticsService, aiApiService } from "@/services/api";
 import { Card, Badge, Loader } from "@/components/ui";
 
+interface AnalyticsMetrics {
+  completedTasks: number;
+  completionRate: number;
+  totalFocusMinutes: number;
+  completedGoals: number;
+  totalGoals: number;
+  activeHabitsCount: number;
+  bestStreak: number;
+  completedTasksCountByDate: Record<string, number>;
+}
+
 export function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState<any>(null);
+  const [metrics, setMetrics] = useState<AnalyticsMetrics | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // AI insights state variables
   const [habitAdvice, setHabitAdvice] = useState<string | null>(null);
@@ -36,8 +48,8 @@ export function AnalyticsPage() {
         } else {
           setGoalAdvice(null);
         }
-      } catch (_e) {
-        // Quiet fallback or mock if some route fails
+      } catch {
+        setError("Analytics could not be loaded. Check your connection and try again.");
       } finally {
         setLoading(false);
         setAiLoading(false);
@@ -131,6 +143,9 @@ export function AnalyticsPage() {
           <Loader size="lg" />
         </div>
       ) : (
+        error ? (
+          <Card className="p-8 text-center text-danger">{error}</Card>
+        ) : (
         <div className="space-y-8">
           {/* Dashboard Metric Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -293,6 +308,7 @@ export function AnalyticsPage() {
             </div>
           </Card>
         </div>
+        )
       )}
     </div>
   );

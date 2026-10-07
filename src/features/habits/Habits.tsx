@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Sparkles, Trash2, Calendar, Flame, Check, Brain, X, RefreshCw } from "lucide-react";
+import { Sparkles, Trash2, Calendar, Flame, Brain, X, RefreshCw } from "lucide-react";
 import { habitsService, aiApiService } from "@/services/api";
 import type { Habit } from "../../../shared/types";
 import { Button, Input, Card, Badge, Loader, EmptyState } from "@/components/ui";
@@ -112,11 +112,6 @@ export function HabitsPage() {
     } finally {
       setAdviceLoading(false);
     }
-  }
-
-  function formatDateHeader(dateStr: string) {
-    const d = new Date(dateStr);
-    return { day: d.toLocaleDateString("en-US", { weekday: "short" }), num: d.getDate() };
   }
 
   return (
